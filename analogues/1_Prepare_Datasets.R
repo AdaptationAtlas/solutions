@@ -93,28 +93,37 @@ names(wc_data)<-Variables
 
 # Get worldclim CMIP6 ####
 WC_CMIPDir<-paste0(RawDir,"worldclim/CIMP6/")
-if(!dir.exists(WCDir)){
-    dir.create(WCDir)
+if(!dir.exists(WC_CMIPDir)){
+    dir.create(WC_CMIPDir)
 }
 
-GetWorldClimGCMs<-function(Variable,GCMs,Scenarios,SaveDir){
+GetWorldClimGCMs<-function(Variable,GCMs,Scenarios,Periods,Resolutions,SaveDir){
      if(!dir.exists(SaveDir)){
       dir.create(SaveDir,recursive=T)
     }
           
     for(VAR in Variable){
         for(SCENARIO in Scenarios){
-            for(GCM in GCMs){      
-                URL<-paste0("https://geodata.ucdavis.edu/cmip6/2.5m/",GCM,"/",Scenarios,"/wc2.1_2.5m_",VAR,"_",GCM,"_",SCENARIO,"_2041-2060.zip")
-                destfile<-paste0(SaveDir,"wc2.1_",Resolution,"_",VAR,".zip")
-                # Display progress
-                cat('\r                                                           ')
-                cat('\r',paste0("Downloading file: ",VAR,"-",SCENARIO,"-",GCM))
-                flush.console()
-                
-                if(!file.exists(destfile)){
-                    download.file(URL, destfile)
-                } 
+            for(GCM in GCMs){ 
+                for(PERIOD in Periods){
+                    for(RESOLUTION in Resolutions){
+                        URL<-paste0("https://geodata.ucdavis.edu/cmip6/",Resolution,"/",GCM,"/",SCENARIO,"/wc2.1_",RESOLUTION,"_",VAR,"_",GCM,"_",SCENARIO,"_",PERIOD,".tif")
+                        destfile<-paste0(SaveDir,"wc2.1_",RESOLUTION,"_",VAR,"_",GCM,"_",SCENARIO,"_",PERIOD,".tif")
+                        # Display progress
+                        cat('\r                                                           ')
+                        cat('\r',paste0("Downloading file: ",VAR,"-",SCENARIO,"-",GCM))
+                        flush.console()
+
+                        # Some model x scenario combinations are missing
+                        if(!(GCM == "GFDL-ESM4" & SCENARIO %in% c("ssp245","ssp585")) & 
+                           !(GCM == "FIO-ESM-2-0" & SCENARIO == "ssp370") &
+                           !(GCM == "HadGEM3-GC31-LL" & SCENARIO == "ssp370")){
+                            if(!file.exists(destfile)){
+                                download.file(URL, destfile)
+                                }
+                        }
+                    } 
+                }
             }
         }
     }
@@ -124,11 +133,57 @@ GCMs<-c("ACCESS-CM2","ACCESS-ESM1-5","BCC-CSM2-MR","CanESM5","CanESM5-CanOE","CM
 Scenarios<-c("ssp126","ssp245","ssp370","ssp585")
 Variables<-c("tmin","tmax","prec")
 
-GetWorldClimGCMs(Variable=Variables,Scenarios=Scenarios,GCMs=GCMs,SaveDir=WCDir)
+options(timeout=120)
+GetWorldClimGCMs(Variable=Variables,Scenarios=Scenarios,GCMs=GCMs,Periods="2041-2060",Resolutions="2.5m",SaveDir=WC_CMIPDir)
 
-# Create a mask ####
-msk <-wc_data[["prec"]][[1]]
-msk[which(!is.na(msk[]))] <- 1
+# Process worldclim CMIP6 data
+WC_CIMPDirInt<-paste0(IntDir,"worldclim/CMIP6/")
+if(!dir.exists(WC_CIMPDirInt)){
+    dir.create(WC_CIMPDirInt)
+}
+
+Var_x_Scen<-expand.grid(Variables,Scenarios,"2041-2060","2.5m")
+
+wc_future_data<-lapply(1:nrow(Var_x_Scen),FUN=function(i){
+    VAR<-Var_x_Scen[i,1]
+    SCENARIO<-Var_x_Scen[i,2]
+    PERIOD<-Var_x_Scen[i,3]
+    RESOLUTION<-Var_x_Scen[i,4]
+
+    File<-paste0(WC_CIMPDirInt,"wc2.1_",RESOLUTION,"_",VAR,"_",SCENARIO,"_",PERIOD,".tif",sep="")
+    
+  if (!file.exists(File)){
+     
+      Files <- paste0(WC_CMIPDir,"wc2.1_",RESOLUTION,"_",VAR,"_",GCMs,"_",SCENARIO,"_",PERIOD,".tif")
+      Files<-Files[file.exists(Files)]
+      
+      wc_data <- lapply(Files,FUN=function(FILE){
+           terra::mask(terra::crop(terra::rast,FILE),sh_africa),sh_africa)
+          })
+      
+      wc_data<-lapply(1:12,FUN=function(i){
+          Data<-terra::rast(lapply(wc_data,"[[",1))
+          Data<-terra::mean(Data)
+          Data
+          })
+    
+      wc_data <- terra::mask(terra::crop(wc_data, sh_africa),sh_africa)
+      
+                
+      terra::writeRaster(wc_data[LAYER],paste0(WCDirInt,LAYER,"_masked.tif"))
+           
+      unlink(Files)
+      wc_data
+      
+  }else{
+      
+      Files<-list.files(WCDirInt,VAR,full.names=T) 
+      Files<-Files[!grepl("zip",Files)]
+      terra::rast(Files)
+      }
+})
+
+names(wc_data)<-Variables
 
 # Load and prepare soilgrids ####
 SoilDir<-"/home/jovyan/common_data/soilgrids/raw/"
