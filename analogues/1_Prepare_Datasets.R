@@ -65,6 +65,7 @@ if(!dir.exists(WCDirInt)){
     dir.create(WCDirInt)
 }
 
+# NOTE TERRA CAN SIMPLY SAVE THE ENTIRE STACK USING WRITE RASTER!
 wc_data<-lapply(Variables,FUN=function(VAR){
   
   if (!file.exists(paste0(WCDirInt,"wc2.1_",Resolution,"_",VAR,"01_masked.tif",sep=""))) {
@@ -107,7 +108,7 @@ GetWorldClimGCMs<-function(Variable,GCMs,Scenarios,Periods,Resolutions,SaveDir){
             for(GCM in GCMs){ 
                 for(PERIOD in Periods){
                     for(RESOLUTION in Resolutions){
-                        URL<-paste0("https://geodata.ucdavis.edu/cmip6/",Resolution,"/",GCM,"/",SCENARIO,"/wc2.1_",RESOLUTION,"_",VAR,"_",GCM,"_",SCENARIO,"_",PERIOD,".tif")
+                        URL<-paste0("https://geodata.ucdavis.edu/cmip6/",RESOLUTION,"/",GCM,"/",SCENARIO,"/wc2.1_",RESOLUTION,"_",VAR,"_",GCM,"_",SCENARIO,"_",PERIOD,".tif")
                         destfile<-paste0(SaveDir,"wc2.1_",RESOLUTION,"_",VAR,"_",GCM,"_",SCENARIO,"_",PERIOD,".tif")
                         # Display progress
                         cat('\r                                                           ')
@@ -133,7 +134,7 @@ GCMs<-c("ACCESS-CM2","ACCESS-ESM1-5","BCC-CSM2-MR","CanESM5","CanESM5-CanOE","CM
 Scenarios<-c("ssp126","ssp245","ssp370","ssp585")
 Variables<-c("tmin","tmax","prec")
 
-options(timeout=120)
+options(timeout=480)
 GetWorldClimGCMs(Variable=Variables,Scenarios=Scenarios,GCMs=GCMs,Periods="2041-2060",Resolutions="2.5m",SaveDir=WC_CMIPDir)
 
 # Process worldclim CMIP6 data
@@ -152,34 +153,44 @@ wc_future_data<-lapply(1:nrow(Var_x_Scen),FUN=function(i){
 
     File<-paste0(WC_CIMPDirInt,"wc2.1_",RESOLUTION,"_",VAR,"_",SCENARIO,"_",PERIOD,".tif",sep="")
     
+    # Display progress
+    cat('\r                                                           ')
+    cat('\r',paste0("Processing: ",VAR,"-",SCENARIO,"-",PERIOD,"-",RESOLUTION))
+    flush.console()
+    
   if (!file.exists(File)){
      
       Files <- paste0(WC_CMIPDir,"wc2.1_",RESOLUTION,"_",VAR,"_",GCMs,"_",SCENARIO,"_",PERIOD,".tif")
       Files<-Files[file.exists(Files)]
       
-      wc_data <- lapply(Files,FUN=function(FILE){
-           terra::mask(terra::crop(terra::rast,FILE),sh_africa),sh_africa)
+      wc_data <- lapply(1:length(Files),FUN=function(i){
+          FILE<-Files[i]
+          cat('\r                                                           ')
+          cat('\r',paste0("Crop & Mask File: ",i,"/",length(Files)))
+          flush.console()
+          
+         terra::mask(terra::crop(terra::rast(FILE),sh_africa),sh_africa)
           })
       
-      wc_data<-lapply(1:12,FUN=function(i){
-          Data<-terra::rast(lapply(wc_data,"[[",1))
+      Layers<-names(wc_data[[1]])
+      
+      wc_data<-terra::rast(lapply(1:12,FUN=function(i){
+          cat('\r                                                           ')
+          cat('\r',paste0("Averaging GCMs for month: ",i))
+          flush.console()
+          Data<-terra::rast(lapply(wc_data,"[[",i))
           Data<-terra::mean(Data)
           Data
-          })
-    
-      wc_data <- terra::mask(terra::crop(wc_data, sh_africa),sh_africa)
+          }))
       
+      names(wc_data)<-Layers
                 
-      terra::writeRaster(wc_data[LAYER],paste0(WCDirInt,LAYER,"_masked.tif"))
+      terra::writeRaster(wc_data,File)
            
-      unlink(Files)
       wc_data
       
   }else{
-      
-      Files<-list.files(WCDirInt,VAR,full.names=T) 
-      Files<-Files[!grepl("zip",Files)]
-      terra::rast(Files)
+      terra::rast(File)
       }
 })
 
@@ -196,6 +207,7 @@ if(!dir.exists(SoilIntDir)){
 Parameters<-c("sand","phh2o")
 Depths<-c("0-5","5-15","15-30","30-60","60-100")
 
+# NOTE TERRA CAN SIMPLY SAVE THE ENTIRE STACK USING WRITE RASTER!
 soilstk<-lapply(Parameters,FUN=function(PAR){
     Files<-paste0(SoilIntDir,PAR,"_",Depths,".tif")    
     if(!all(file.exists(Files))){
