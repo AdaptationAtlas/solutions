@@ -1,14 +1,43 @@
-devtools::source_url("https://github.com/EiA2030/source_data/blob/main/R/soilgrids250_download.R?raw=TRUE")
-soilgrids250_download(par = "soc", depth = "5-15", path = tempdir(), lonlat=NULL)
+# Set save location of intermediate datasets
+IntDir<-"/home/jovyan/common_data/atlas/interim/"
+if(!dir.exists(IntDir)){
+    dir.create(IntDir,recursive=T)
+    }
 
-c("BLDFIE","CECSOL","CLYPPT","SNDPPT","SLTPPT","ORCDRC","PHIHOX","AWCh3")
+# Load africa map ####
+sh_ctry<-terra::vect("/home/jovyan/common_data/atlas/raw/0_boundaries/gadml0_4326.shp")
+sh_ctry <- terra::project(sh_ctry, "+proj=longlat +ellps=WGS84 +no_defs")
+sh_africa<-terra::aggregate(sh_ctry)
 
-Path<-"/home/jovyan/common_data/soilgrids/raw/"
-Vars<-c("bdod","cec","clay","sand","silt","soc","phh20")
+# Load and prepare soilgrids ####
+SoilDir<-"/home/jovyan/common_data/soilgrids/raw/"
+#Parameters<-c("bdod","cec","clay","sand","silt","soc","phh2o")
+Parameters<-c("sand","phh2o")
 Depths<-c("0-5","5-15","15-30","30-60","60-100")
 
-lapply(Vars,FUN=function(VAR){
-terra::rast(paste0(Path,VAR,"_",Depths,".vrt"))
+soilstk<-lapply(Parameters,FUN=function(PAR){
+terra::rast(paste0(SoilDir,PAR,"_",Depths,".vrt"))
 })
+
+stk<-terra::rast(paste0(SoilDir,PAR,"_",Depths,".vrt"))
+stk<-terra::mask(terra::crop(stk,sh_africa),sh_africa)
+terra::plot(stk)
+
+soilstk<-lapply(Parameters,FUN=function(PAR){
+    Files<-paste0(IntDir,"soilgrids/",PAR,"_",Depths,".tif")    
+    if(!all(file.exists(Files))){
+    stk<-terra::rast(paste0(Path,PAR,"_",Depths,".vrt"))
+    stk<-terra::mask(terra::crop(stk,sh_africa),sh_africa)
+    
+    lapply(names(stk),FUN=function(LAYER){
+    terra::writeRaster(stk[LAYER],paste0(IntDir,"soilgrids/",LAYER,".tif"))
+    })
+        
+    }
+    
+    terra::rast(Files)
+})
+
+names(soilstk)<-Parameters
 
 
