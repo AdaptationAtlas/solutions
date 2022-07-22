@@ -35,14 +35,9 @@ data_sites<-data.table::fread(paste0(cimdir,"/analogues_ERA.csv")
 MinSites<-1
 MaxPracs<-1 # Max number of practices in combination to consider
 
-data.sites<-data.sites[(PrName == "Mulch-Reduced Tillage" | Npracs<=MaxPracs) & !Product.Simple %in% ExcludeProducts,
-     list(N.Sites=length(unique(Site.ID)),
-          N.Countries=length(unique(Country)),
-          N.AEZ16=length(unique(AEZ16))),
-     by=c("PrName","Product.Simple","Out.SubInd")
-     ][N.Sites >= MinSites]
-    
-                       
+# Subset ERA data
+data.sites<-data.sites[(PrName == "Mulch-Reduced Tillage" | Npracs<=MaxPracs) & !Product.Simple %in% ExcludeProducts]
+                           
 # Worldclim historic####
 WCDirInt<-paste0(IntDir,"worldclim/")
 
