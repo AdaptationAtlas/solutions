@@ -273,7 +273,8 @@ data_sites<-ERAAnalyze(Data=data.table::copy(ERAPrepared),Aggregate.By=agg_by,rm
 
 data_sites<-data_sites[,Label:=paste(Site.ID, PrName)
                       ][!(is.na(Latitude) | is.na(Longitude))
-                       ][,NPracs:=stringr::str_count(PrName, "-")]
+                       ][,NPracs:=stringr::str_count(PrName, "-")
+                        ][!PrName=="" & !Product.Simple=="" & Product.Type=="Plant Product"]
 
 data_sites<-as.data.frame(data_sites)
 

@@ -24,17 +24,24 @@ sh_africa<-terra::vect(paste0(BoundIntDir,"gadml0_4326_agg.shp"))
 msk<-terra::rast(paste0(IntDir,"0_boundaries/msk.tif"))
 
 # ERA ####
-data_sites<-data.frame(data.table::fread(paste0(cimdir,"/analogues_ERA.csv"))
+data_sites<-data.table::fread(paste0(cimdir,"/analogues_ERA.csv")
 
 # Exclude products
 # CHANGE THIS TO BE MAPSPAM crops to include?
-ExcludeProducts<-c("Fodder Legume","Fodder Tree","Okra","Olive","Other Bean","Pepper","Pumpkin","Tomato","Watermelon","African Yam Bean","Amaranth",
                    "Amaranth Grain","Apple","Cabbage","Capsicum","Carrot & Parsnip","Chickpea","Chili","Cucumber","Date","Eggplant","Fava Bean","Firewood",
                    "Fodder Tree","Fonio","Garlic","Grape","Grapefruit & Pomelo","Jatropha","Jujube","Lablab","Melon","Napier Grass","Onion","Other Leafy Green",
                    "Other Spice","Other Veg","Peas","Spinach","Turnip","Zucchini")
 
 MinSites<-1
 MaxPracs<-1 # Max number of practices in combination to consider
+
+data.sites<-data.sites[(PrName == "Mulch-Reduced Tillage" | Npracs<=MaxPracs) & !Product.Simple %in% ExcludeProducts,
+     list(N.Sites=length(unique(Site.ID)),
+          N.Countries=length(unique(Country)),
+          N.AEZ16=length(unique(AEZ16))),
+     by=c("PrName","Product.Simple","Out.SubInd")
+     ][N.Sites >= MinSites]
+    
                        
 # Worldclim historic####
 WCDirInt<-paste0(IntDir,"worldclim/")
@@ -149,30 +156,14 @@ for(k in 1:nrow(Vars)){
     #3. combine all in a sensible layer and save individual layers and output as .RData
     
     #Subset Era Data ====
-    Y<-data.table(data_sites)
     
-    #mulch-reduced tillage interaction
-    M.RT<-Y[Product.Type=="Plant Product" &  
-              Out.SubInd == "Crop Yield" & 
-              RR>=Threshold &!PrName=="" & 
-              Product.Simple!="" & 
-              PrName == "Mulch-Reduced Tillage" & 
-              !Product.Simple %in% ExcludeProducts,
+    Y<-data.sites[RR>=Threshold &!PrName=="",
             list(N.Sites=length(unique(Site.ID)),
                  N.Countries=length(unique(Country)),
                  N.AEZ16=length(unique(AEZ16))),
             by=c("PrName","Product.Simple","Out.SubInd")
             ][N.Sites >= MinSites]
-    
-    #individual practices
-    Y<-Y[Product.Type=="Plant Product" &  Out.SubInd == "Crop Yield" & RR>=Threshold &!PrName=="" & !Product.Simple=="" & Npracs<=MaxPracs & !Product.Simple %in% ExcludeProducts,
-         list(N.Sites=length(unique(Site.ID)),N.Countries=length(unique(Country)),N.AEZ16=length(unique(AEZ16))),
-         by=c("PrName","Product.Simple","Out.SubInd")
-         ][N.Sites >= MinSites]
-    
-    #combine both tables
-    Y<-rbind(Y,M.RT)
-    Y[,Product.Simple:=as.character(Product.Simple)]
+  
     
     # Points <=10 - Run practices in parallel (gets clogged up when some cores have a practice with large numbers of sites) =====
     run_points <- function(i, pr_df, data_sites, cimdir, Threshold, Year, Scenario, vr, etype='pos', DoLite=F) {
