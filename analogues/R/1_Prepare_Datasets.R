@@ -99,7 +99,7 @@ names(wc_data)<-Variables
 
 # Create a mask
 msk<-paste0(IntDir,"0_boundaries/msk.tif")
-if(!file.exist(msk)){
+if(!file.exists(msk)){
     msk<-wc_data$prec[[1]]
     msk[!is.na(msk)]<-0
     terra::writeRaster(msk,)
@@ -148,7 +148,7 @@ GetWorldClimGCMs<-function(Variable,GCMs,Scenarios,Periods,Resolutions,SaveDir){
 GCMs<-c("ACCESS-CM2","ACCESS-ESM1-5","BCC-CSM2-MR","CanESM5","CanESM5-CanOE","CMCC-ESM2","CNRM-CM6-1","CNRM-CM6-1-HR","CNRM-ESM2-1","EC-Earth3-Veg","EC-Earth3-Veg-LR","FIO-ESM-2-0","GFDL-ESM4","GISS-E2-1-G","GISS-E2-1-H","HadGEM3-GC31-LL","INM-CM4-8","INM-CM5-0","IPSL-CM6A-LR","MIROC-ES2L","MIROC6","MPI-ESM1-2-HR","MPI-ESM1-2-LR","MRI-ESM2-0","UKESM1-0-LL")
 Scenarios<-c("ssp126","ssp245","ssp370","ssp585")
 Variables<-c("tmin","tmax","prec")
-Period<-"2041-2060"
+Period<-c("2021-2040","2041-2060")
 Resolution<-"2.5m"
 
 options(timeout=480)
@@ -251,3 +251,36 @@ soilstk<-lapply(Parameters,FUN=function(PAR){
 
 # Could this step be done using assign? or "%>%"
 names(soilstk)<-Parameters
+
+# ERA #####
+# Load data (in future data should be publically available from the ERAg package)
+load("Data/ERA_Derived.rda")
+# Source functions to prepare and analyse data (in future these should be publically available from the ERAg package)
+source("R/PrepareERA.R")
+source("R/ERAAnalyze.R")
+
+# Set analysis aggregation level to site, practice, subindicator and product.simple
+agg_by <- c("Site.ID","PrName","Out.SubInd","Product.Simple","Product.Type")
+
+# Subset data to crop yield
+ERA_Derived<-ERA_Derived[Out.SubInd=="Crop Yield"]
+
+# Prepare ERA (see function documentation for more information)
+ERAPrepared<-ERAg::PrepareERA(data.table::copy(ERA_Derived),DoCombinations=F,CombineAll = F, PLevel = "Practice")
+
+# Analyze ERA (see function documentation for more information)
+data_sites<-ERAAnalyze(Data=data.table::copy(ERAPrepared),Aggregate.By=agg_by,rmOut=T,fast=F)
+
+data_sites<-data_sites[,Label:=paste(Site.ID, PrName)
+                      ][!(is.na(Latitude) | is.na(Longitude))
+                       ][,NPracs:=stringr::str_count(PrName, "-")]
+
+data_sites<-as.data.frame(data_sites)
+
+cimdir <- paste0(IntDir,"/analogues/")
+
+if(!dir.exists(cimdir){
+dir.create(cimdir)
+    }
+   
+data.table::fwrite(data_sites,paste0(cimdir,"/analogues_ERA.csv"))
