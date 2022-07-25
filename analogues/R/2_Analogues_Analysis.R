@@ -119,6 +119,8 @@ for(k in 1:nrow(Vars)){
     wc_prec <- wc_data$prec
     lwc_tmin <- wc_data$tmin
     lwc_tmax <- wc_data$tmax
+    lwc_tmean<-(lwc_tmin+lwc_tmax)/2
+    rm(lwc_tmin,lwc_tmax)
     
     #climate: load future ####
     
@@ -126,6 +128,9 @@ for(k in 1:nrow(Vars)){
        wc_prec_fut<-wc_future_data[[paste0("prec-",Scenario,"-",Period)]]
        wc_tmin_fut<-wc_future_data[[paste0("tmin-",Scenario,"-",Period)]]
        wc_tmax_fut<-wc_future_data[[paste0("tmax-",Scenario,"-",Period)]]
+       wc_tmean_fut<-(wc_tmin_fut+wc_tmax_fut)/2
+        
+       rm(wc_tmin_fut,wc_tmax_fut)
        }    
     
     ############################################################
@@ -139,7 +144,6 @@ for(k in 1:nrow(Vars)){
     #3. combine all in a sensible layer and save individual layers and output as .RData
     
     #Subset Era Data ====
-    
     Y<-data_sites[RR>=Threshold &!PrName=="",
             list(N.Sites=length(unique(Site.ID)),
                  N.Countries=length(unique(Country)),
@@ -148,8 +152,7 @@ for(k in 1:nrow(Vars)){
             ][N.Sites >= MinSites]    #practice list with only two fields
     
     X<-Y[,c("PrName","Product.Simple")]
-     
-        
+             
     #run in parallel if 1 practice or more
     if(nrow(X)>0){
         xres <- parallel::mclapply(1:nrow(X), 
