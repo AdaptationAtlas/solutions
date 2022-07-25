@@ -13,7 +13,7 @@
         
         # Restructure data and classify points-----
         pdata <- ERA_data[PrName == Practice & Product.Simple == Product & Out.SubInd == Outcome
-                         ][!(is.na(Lat) & is.na(Lon)),c("Lon","Lat","RR")]]        
+                         ][!(is.na(Lat) & is.na(Lon)),c("Lon","Lat","RR")]        
        
         #positive yield impact  =====
         in_data <- pdata[RR >= Threshold
