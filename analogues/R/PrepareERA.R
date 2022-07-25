@@ -37,19 +37,21 @@ PrepareERA<-function(Data,
                              "Product.Simple","Out.Pillar","Out.SubPillar","Out.Ind","Out.SubInd","SubPrName","PrName","Theme","SubPrName.Base","PrName.Base",
                              "T.Descrip", "C.Descrip", "C.NI","C.NO", "T.NI", "T.NO","PrName.Code","SubPrName.Code", "Product.Simple.Code",
                              "Product.Subtype.Code", "Product.Type.Code","Out.Pillar.Code","Out.SubPillar.Code","Out.Ind.Code", "Out.SubInd.Code",
-                             "Theme.Code","PrName.Base.Code","SubPrName.Base.Code","Theme.Base.Code","Partial.Outcome.Name","Partial.Outcome.Code")
+                             "Theme.Code","PrName.Base.Code","SubPrName.Base.Code","Theme.Base.Code","Partial.Outcome.Name","Partial.Outcome.Code"),
+                     OutcomeCodes,
+                     PracticeCodes,
+                     EUCodes
 ){
 
   DataX<-data.table::copy(Data)
 
-  OutcomeCodes<-data.table::copy(ERAg::OutcomeCodes)
-  PracticeCodes<-data.table::copy(ERAg::PracticeCodes)
-  EUCodes<-data.table::copy(ERAg::EUCodes)
+  OutcomeCodes<-data.table::copy(OutcomeCodes)
+  PracticeCodes<-data.table::copy(PracticeCodes)
+  EUCodes<-data.table::copy(EUCodes)
 
   if("Negative Values" %in% colnames(OutcomeCodes)){
     setnames(OutcomeCodes,"Negative Values","Negative.Values")
   }
-
 
   Flip.Neg<-function(DataX,OutcomeCodes){
     N1<-OutcomeCodes[match(DataX[,Outcode],OutcomeCodes[,Code]),Sign]=="n"
@@ -76,7 +78,6 @@ PrepareERA<-function(Data,
   ][Outcode==267.1,Out.SubInd.S:=OutcomeCodes[Code==267,Subindicator.Short]
   ][Outcode==267.1,Out.SubInd.Code:=OutcomeCodes[Code==267,Subindicator.Code]
   ][Outcode==267.1,Outcode:=267]
-
 
   DataX[Outcode==265.1,MeanC:=1/MeanC
   ][Outcode==265.1,MeanT:=1/MeanT
@@ -124,9 +125,7 @@ PrepareERA<-function(Data,
 
   # Restructure DataX to deal with when negative RR is better
   # Note that this changes the structure of the compendium dataset. The resulting data.table should not be shared as this could lead to confusion.
-
   DataX<-Flip.Neg(DataX=DataX,OutcomeCodes)
-
 
   # Calculate response ratios
   DataX<-DataX[Neg.Vals=="N"]
@@ -160,8 +159,6 @@ PrepareERA<-function(Data,
       }
 
     }else{
-
-
       if(PLevel=="Practice"){
         Combinations<-rbindlist(lapply(Practices,FUN=function(X){
           Y<-DataX[grepl(X,PrName) & grepl("-",PrName)]
