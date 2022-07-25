@@ -122,7 +122,7 @@ ERAAnalyze<-function(Data,rmOut=T,Aggregate.By,ROUND=5,Fast=F,UseAllCores=F){
   if(rmOut){
 
     Outliers<-unlist(Data[,R:=1:nrow(Data)
-    ][,list(Outliers=list(R[ERAg::OutCalc(yi)])), by=Aggregate.By
+    ][,list(Outliers=list(R[OutCalc(yi)])), by=Aggregate.By
     ][,Outliers])
 
     Data<-Data[!Outliers]
@@ -131,7 +131,6 @@ ERAAnalyze<-function(Data,rmOut=T,Aggregate.By,ROUND=5,Fast=F,UseAllCores=F){
   # Remove any data where MeanC and MeanT are identical (creates Error in asMethod(object) : not a positive definite matrix)
 
   Data<-Data[,Identical:=all(MeanT==MeanC),by=Aggregate.By][Identical==F][,Identical:=NULL]
-
 
   # Estimate treatment effect size ####
 
