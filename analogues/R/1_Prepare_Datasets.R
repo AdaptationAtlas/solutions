@@ -158,7 +158,8 @@ GetWorldClimGCMs<-function(Variable,GCMs,Scenarios,Periods,Resolutions,SaveDir){
     }
 }
 
-GCMs<-c("ACCESS-CM2","ACCESS-ESM1-5","BCC-CSM2-MR","CanESM5","CanESM5-CanOE","CMCC-ESM2","CNRM-CM6-1","CNRM-CM6-1-HR","CNRM-ESM2-1","EC-Earth3-Veg","EC-Earth3-Veg-LR","FIO-ESM-2-0","GFDL-ESM4","GISS-E2-1-G","GISS-E2-1-H","HadGEM3-GC31-LL","INM-CM4-8","INM-CM5-0","IPSL-CM6A-LR","MIROC-ES2L","MIROC6","MPI-ESM1-2-HR","MPI-ESM1-2-LR","MRI-ESM2-0","UKESM1-0-LL")
+#GCMs<-c("ACCESS-CM2","ACCESS-ESM1-5","BCC-CSM2-MR","CanESM5","CanESM5-CanOE","CMCC-ESM2","CNRM-CM6-1","CNRM-CM6-1-HR","CNRM-ESM2-1","EC-Earth3-Veg","EC-Earth3-Veg-LR","FIO-ESM-2-0","GFDL-ESM4","GISS-E2-1-G","GISS-E2-1-H","HadGEM3-GC31-LL","INM-CM4-8","INM-CM5-0","IPSL-CM6A-LR","MIROC-ES2L","MIROC6","MPI-ESM1-2-HR","MPI-ESM1-2-LR","MRI-ESM2-0","UKESM1-0-LL")
+GCMs<-c("ACCESS-ESM1-5","EC-Earth3-Veg","INM-CM5-0","MPI-ESM1-2-HR","MRI-ESM2-0")
 Scenarios<-c("ssp126","ssp245","ssp370","ssp585")
 Variables<-c("tmin","tmax","prec")
 Period<-c("2021-2040","2041-2060")
@@ -299,12 +300,18 @@ data_sites<-data_sites[,Label:=paste(Site.ID, PrName)
                         ][!PrName=="" & !Product.Simple=="" & Product.Type!="Plant Product"
                          ][,Product.Simple:=as.character(Product.Simple)]
 
-data_sites<-as.data.frame(data_sites)
-
 cimdir <- paste0(IntDir,"analogues/")
 
 if(!dir.exists(cimdir)){
 dir.create(cimdir)
     }
-   
+
+# Cleanup any data points outside mask
+data.table::setnames(data_sites,c("Longitude","Latitude"),c("Lon","Lat"))
+
+data_sites<-data_sites[,isvalid:=terra::extract(msk, data_sites[,c("Lon","Lat")])[,2]
+                      ][!is.na(isvalid)
+                       ][,isvalid:=NULL]
+
+# Save ERA dataset
 data.table::fwrite(data_sites,paste0(cimdir,"/analogues_ERA.csv"))
