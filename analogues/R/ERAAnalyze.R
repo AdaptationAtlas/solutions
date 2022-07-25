@@ -149,7 +149,7 @@ ERAAnalyze<-function(Data,rmOut=T,Aggregate.By,ROUND=5,Fast=F,UseAllCores=F){
       ][,Weight.Study:=(Rep^2/(2*Rep))/N.Obs.Study # Recalculate Weightings
       ][,list(Observations=.N,
               Studies=length(unique(Code)),
-              Sites=length(unique(Site.Key)),
+              Sites=length(unique(ID)),
               RR.Shapiro.Sig=round(FunShap(log(MeanT/MeanC)),ROUND),
               RR=stats::weighted.mean(log(MeanT/MeanC),Weight.Study,na.rm=T),
               RR.median=spatstat.geom::weighted.median(log(MeanT/MeanC),Weight.Study,na.rm = T),
