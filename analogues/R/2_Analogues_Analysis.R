@@ -1,5 +1,8 @@
 # Packages
-Packages<-c("data.table","parallel","stringr","terra")
+require(data.table)
+require(parallel)
+require(stringr)
+require(terra)
 
 # Analysis version
 vr <- 6
@@ -10,11 +13,17 @@ Cores<-parallel::detectCores()-1
 # Run full or streamlined analysis?
 DoLite<-T
 
+# Set working directory ####
+# Go up a level if we are in the the "/R" directory
+if(substr(getwd(),nchar(getwd())-1,nchar(getwd()))=="/R"){
+    setwd(substr(getwd(),1,nchar(getwd())-2))
+}
+
 # Set save location of intermediate datasets
 IntDir<-"/home/jovyan/common_data/atlas/interim/"
 
 # Create analysis save folder
-cimdir <- paste0(IntDir,"/analogues")
+cimdir <- paste0(IntDir,"analogues/")
 
 # Africa map ####
 BoundIntDir<-paste0(IntDir,"0_boundaries/")
@@ -24,11 +33,11 @@ sh_africa<-terra::vect(paste0(BoundIntDir,"gadml0_4326_agg.shp"))
 msk<-terra::rast(paste0(IntDir,"0_boundaries/msk.tif"))
 
 # ERA ####
-data_sites<-data.table::fread(paste0(cimdir,"/analogues_ERA.csv")
+data_sites<-data.table::fread(paste0(cimdir,"analogues_ERA.csv"))
 
 # Exclude products
 # CHANGE THIS TO BE MAPSPAM crops to include?
-                   "Amaranth Grain","Apple","Cabbage","Capsicum","Carrot & Parsnip","Chickpea","Chili","Cucumber","Date","Eggplant","Fava Bean","Firewood",
+ExcludeProducts<-c("Amaranth Grain","Apple","Cabbage","Capsicum","Carrot & Parsnip","Chickpea","Chili","Cucumber","Date","Eggplant","Fava Bean","Firewood",
                    "Fodder Tree","Fonio","Garlic","Grape","Grapefruit & Pomelo","Jatropha","Jujube","Lablab","Melon","Napier Grass","Onion","Other Leafy Green",
                    "Other Spice","Other Veg","Peas","Spinach","Turnip","Zucchini")
 
@@ -36,12 +45,17 @@ MinSites<-1
 MaxPracs<-1 # Max number of practices in combination to consider
 
 # Subset ERA data
-data.sites<-data.sites[(PrName == "Mulch-Reduced Tillage" | Npracs<=MaxPracs) & !Product.Simple %in% ExcludeProducts]
+data_sites<-data_sites[(PrName == "Mulch-Reduced Tillage" | NPracs<=MaxPracs) & !Product.Simple %in% ExcludeProducts]
                            
-# Worldclim historic####
-WCDirInt<-paste0(IntDir,"worldclim/")
-
+# Worldclim ####
+# Set parameters to include in analysis
+Scenarios<-c("ssp126","ssp245","ssp370","ssp585")
 Variables<-c("tmin","tmax","prec")
+Period<-"2041-2060"
+Resolution<-"2.5m"
+
+# Worldclim historic ####
+WCDirInt<-paste0(IntDir,"worldclim/")
 
 wc_data<-lapply(Variables,FUN=function(VAR){
       File<-paste0(WCDirInt,"wc2.1_",Resolution,"_",VAR,"_masked.tif") 
@@ -51,11 +65,6 @@ wc_data<-lapply(Variables,FUN=function(VAR){
 names(wc_data)<-Variables
 
 # Worldclim future####
-Scenarios<-c("ssp126","ssp245","ssp370","ssp585")
-Variables<-c("tmin","tmax","prec")
-Period<-"2041-2060"
-Resolution<-"2.5m"
-
 Var_x_Scen<-expand.grid(Variables,Scenarios,Period,Resolution)
 
 wc_future_data<-lapply(1:nrow(Var_x_Scen),FUN=function(i){
@@ -82,8 +91,7 @@ soilstk<-lapply(Parameters,FUN=function(PAR){
     terra::rast(File)
 })
 
-names(soilstk)<-Parameters
-                       
+names(soilstk)<-Parameters                     
 
 #Create Scenarios x Years x Tresholds Loop ####
 Scenarios<-c("ssp126","ssp245","ssp370","ssp585")
@@ -96,13 +104,12 @@ Vars<-rbind(Vars,expand.grid(Years=NA,Scenarios="baseline",Threshold=Thresholds)
 #options
 DoNeg<-F # Produce negative suitability?
 DoLite<-T # To save time average the soil rasters across depths (rather than using multiple depths) and cut out min class and quantiles from run_points function
-
                        
 for(k in 1:nrow(Vars)){
     Scenario<-Vars$Scenarios[k]
     Year<-Vars$Years[k]
-    Variable<-Vars$Vars[k]
     Threshold<-Vars$Threshold[k]
+    
     print(paste0("Running: Scenario = ",Vars$Scenarios[k]," | Year = ",Vars$Years[k]," | Threshold = ",Vars$Threshold[k]))
     
     #load monthly climate data -----
@@ -112,33 +119,12 @@ for(k in 1:nrow(Vars)){
     lwc_tmax <- wc_data$tmax
     
     #climate: load future ####
-    File<-paste0(cimdir,"/input_data/prec_",gsub("[.]","_",Scenario),"_",Year,"_","Resamp.rda")
-    if (Scenario != 'baseline') {
-       if(!file.exists(File)){
-           wc_prec_fut<-load.Rdata2(filename=paste0("prec_",gsub("[.]","_",Scenario),"_",Year,"_","2.5min.RData"),path=cimdir) 
-           wc_prec_fut<-resample (wc_prec_fut,msk, method = 'bilinear')
-           wc_prec_fut<-round(wc_prec_fut,0)
-           wc_prec_fut<-stack(wc_prec_fut)
-           if(!inMemory(wc_prec_fut)){wc_prec_fut<-readAll(wc_prec_fut)}
-           save(wc_prec_fut,file=File)
-       } else {
-           wc_prec_fut<-load.Rdata2(filename=paste0("prec_",gsub("[.]","_",Scenario),"_",Year,"_","Resamp.rda"),path=paste0(cimdir,"/input_data"))
-       }
-    }
     
-    File<-paste0(cimdir,"/input_data/tmean_",gsub("[.]","_",Scenario),"_",Year,"_","Resamp.rda")
     if (Scenario != 'baseline') {
-       if(!file.exists(File)){
-           wc_tmean_fut<-load.Rdata2(filename=paste0("tmean_",gsub("[.]","_",Scenario),"_",Year,"_","2.5min.RData"),path=cimdir) 
-           wc_tmean_fut<-resample (wc_tmean_fut,msk, method = 'bilinear')
-           wc_tmean_fut<-round(wc_tmean_fut)
-           wc_tmean_fut<-stack(wc_tmean_fut)
-           if(!inMemory(wc_tmean_fut)){wc_tmean_fut<-readAll(wc_tmean_fut)}
-           save(wc_tmean_fut,file=File)
-       } else {
-           wc_tmean_fut<-load.Rdata2(filename=paste0("tmean_",gsub("[.]","_",Scenario),"_",Year,"_","Resamp.rda"),path=paste0(cimdir,"/input_data")) 
-       }
-    }
+       wc_prec_fut<-wc_future_data[[paste0("prec-",Scenario)]]
+       wc_tmin_fut<-wc_future_data[[paste0("tmin-",Scenario)]]
+       wc_tmax_fut<-wc_future_data[[paste0("tmax-",Scenario)]]
+       }    
     
     ############################################################
     ############################################################
@@ -152,15 +138,14 @@ for(k in 1:nrow(Vars)){
     
     #Subset Era Data ====
     
-    Y<-data.sites[RR>=Threshold &!PrName=="",
+    Y<-data_sites[RR>=Threshold &!PrName=="",
             list(N.Sites=length(unique(Site.ID)),
                  N.Countries=length(unique(Country)),
                  N.AEZ16=length(unique(AEZ16))),
             by=c("PrName","Product.Simple","Out.SubInd")
             ][N.Sites >= MinSites]
   
-    
-    # Points <=10 - Run practices in parallel (gets clogged up when some cores have a practice with large numbers of sites) =====
+     # Points <=10 - Run practices in parallel (gets clogged up when some cores have a practice with large numbers of sites) =====
     run_points <- function(i, pr_df, data_sites, cimdir, Threshold, Year, Scenario, vr, etype='pos', DoLite=F) {
         #get practice and product name
         prname<-pr_df[i,PrName]

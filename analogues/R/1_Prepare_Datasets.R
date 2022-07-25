@@ -1,3 +1,11 @@
+require(data.table)
+require(terra)
+require(spatstat.geom)
+require(diagis)
+require(Hmisc)
+require(lmerTest)
+require(stats)
+
 # Set save location of intermediate datasets
 IntDir<-"/home/jovyan/common_data/atlas/interim/"
 if(!dir.exists(IntDir)){
@@ -9,6 +17,12 @@ RawDir<-"/home/jovyan/common_data/atlas/raw/"
 if(!dir.exists(IntDir)){
     dir.create(IntDir,recursive=T)
     }
+
+# Set working directory ####
+# Go up a level if we are in the the "/R" directory
+if(substr(getwd(),nchar(getwd())-1,nchar(getwd()))=="/R"){
+    setwd(substr(getwd(),1,nchar(getwd())-2))
+}
 
 # Load africa map ####
 BoundIntDir<-paste0(IntDir,"0_boundaries/")
@@ -64,7 +78,6 @@ if(!dir.exists(WCDirInt)){
     dir.create(WCDirInt)
 }
 
-# NOTE TERRA CAN SIMPLY SAVE THE ENTIRE STACK USING WRITE RASTER!
 wc_data<-lapply(Variables,FUN=function(VAR){
         
   File<-paste0(WCDirInt,"wc2.1_",Resolution,"_",VAR,"_masked.tif")
@@ -108,7 +121,7 @@ if(!file.exists(msk)){
 }
 
 # Get worldclim CMIP6 ####
-WC_CMIPDir<-paste0(RawDir,"worldclim/CIMP6/")
+WC_CMIPDir<-paste0(RawDir,"worldclim_CIMP6/")
 if(!dir.exists(WC_CMIPDir)){
     dir.create(WC_CMIPDir)
 }
@@ -163,12 +176,10 @@ wc_future_data<-lapply(1:nrow(Var_x_Scen),FUN=function(i){
     PERIOD<-Var_x_Scen[i,3]
     RESOLUTION<-Var_x_Scen[i,4]
 
-    File<-paste0(WC_DirInt,"wc2.1_",RESOLUTION,"_",VAR,"_",SCENARIO,"_",PERIOD,".tif",sep="")
+    File<-paste0(WCDirInt,"wc2.1_",RESOLUTION,"_",VAR,"_",SCENARIO,"_",PERIOD,".tif",sep="")
     
     # Display progress
-    cat('\r                                                           ')
     cat('\r',paste0("Processing: ",VAR,"-",SCENARIO,"-",PERIOD,"-",RESOLUTION))
-    flush.console()
     
   if (!file.exists(File)){
      
@@ -181,7 +192,7 @@ wc_future_data<-lapply(1:nrow(Var_x_Scen),FUN=function(i){
           cat('\r',paste0("Crop & Mask File: ",i,"/",length(Files)))
           flush.console()
           
-         terra::mask(terra::crop(terra::rast(FILE),sh_africa),sh_africa)
+          suppressWarnings(terra::mask(terra::crop(terra::rast(FILE),sh_africa),sh_africa))
           })
       
       Layers<-names(wc_data[[1]])
@@ -255,32 +266,44 @@ names(soilstk)<-Parameters
 # ERA #####
 # Load data (in future data should be publically available from the ERAg package)
 load("Data/ERA_Derived.rda")
+OutcomeCodes<-data.table::fread("Data/Outcomes.csv")
+PracticeCodes<-data.table::fread("Data/Practices.csv")
+EUCodes<-data.table::fread("Data/EU.csv")
+
 # Source functions to prepare and analyse data (in future these should be publically available from the ERAg package)
 source("R/PrepareERA.R")
 source("R/ERAAnalyze.R")
+source("R/OutCalc.R")
 
 # Set analysis aggregation level to site, practice, subindicator and product.simple
-agg_by <- c("Site.ID","PrName","Out.SubInd","Product.Simple","Product.Type")
+agg_by <- c("Site.ID","Country","Latitude","Longitude","AEZ16simple","PrName","Out.SubInd","Product.Simple","Product.Type")
 
 # Subset data to crop yield
 ERA_Derived<-ERA_Derived[Out.SubInd=="Crop Yield"]
 
 # Prepare ERA (see function documentation for more information)
-ERAPrepared<-ERAg::PrepareERA(data.table::copy(ERA_Derived),DoCombinations=F,CombineAll = F, PLevel = "Practice")
+ERAPrepared<-PrepareERA(data.table::copy(ERA_Derived),
+                        DoCombinations=F,
+                        CombineAll = F, 
+                        PLevel = "Practice",
+                        OutcomeCodes = OutcomeCodes,
+                        PracticeCodes = PracticeCodes,
+                        EUCodes = EUCodes)
 
 # Analyze ERA (see function documentation for more information)
-data_sites<-ERAAnalyze(Data=data.table::copy(ERAPrepared),Aggregate.By=agg_by,rmOut=T,fast=F)
+data_sites<-ERAAnalyze(Data=data.table::copy(ERAPrepared),Aggregate.By=agg_by,rmOut=T,Fast=T)
 
 data_sites<-data_sites[,Label:=paste(Site.ID, PrName)
                       ][!(is.na(Latitude) | is.na(Longitude))
                        ][,NPracs:=stringr::str_count(PrName, "-")
-                        ][!PrName=="" & !Product.Simple=="" & Product.Type=="Plant Product"]
+                        ][!PrName=="" & !Product.Simple=="" & Product.Type!="Plant Product"
+                         ][,Product.Simple:=as.character(Product.Simple)]
 
 data_sites<-as.data.frame(data_sites)
 
-cimdir <- paste0(IntDir,"/analogues/")
+cimdir <- paste0(IntDir,"analogues/")
 
-if(!dir.exists(cimdir){
+if(!dir.exists(cimdir)){
 dir.create(cimdir)
     }
    
