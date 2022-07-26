@@ -1,4 +1,11 @@
-# Packages
+# Set working directory ####
+# Go up a level if we are in the the "/R" directory
+if(substr(getwd(),nchar(getwd())-1,nchar(getwd()))=="/R"){
+    setwd(substr(getwd(),1,nchar(getwd())-2))
+}
+
+
+# Packages & functions ####
 require(data.table)
 require(parallel)
 require(stringr)
@@ -7,6 +14,10 @@ if(!require(analogues)){
 devtools::install_github("CIAT-DAPA/analogues")    
 }
 
+# Functions
+source("R/3_Analogues_Functions.R")
+
+# Parameters ####
 # Analysis version
 Version <- 6
 
@@ -16,11 +27,6 @@ Cores<-parallel::detectCores()-1
 # Run full or streamlined analysis?
 DoLite<-T
 
-# Set working directory ####
-# Go up a level if we are in the the "/R" directory
-if(substr(getwd(),nchar(getwd())-1,nchar(getwd()))=="/R"){
-    setwd(substr(getwd(),1,nchar(getwd())-2))
-}
 
 # Set save location of intermediate datasets
 IntDir<-"/home/jovyan/common_data/atlas/interim/"
@@ -49,7 +55,9 @@ MaxPracs<-1 # Max number of practices in combination to consider
 # Subset ERA data
 data_sites[grepl("Banana",Product.Simple),Product.Simple:="Banana"]             
 data_sites<-data_sites[(PrName == "Mulch-Reduced Tillage" | NPracs<=MaxPracs) & Product.Simple %in% IncludeProducts
-                      ][,ID:=paste("s",1:.N,sep="")] 
+                      ][,ID:=paste0("s",Lat,"_",Lon)] 
+
+pdata<-unique(data.table(data_sites)[Out.SubInd == "Crop Yield" & !(is.na(Lat) & is.na(Lon)),c("Lon","Lat","ID")])
 
 Y<-data_sites[RR>=Threshold &!PrName=="",
         list(N.Sites=length(unique(Site.ID)),
@@ -60,8 +68,6 @@ Y<-data_sites[RR>=Threshold &!PrName=="",
 
 X<-Y[,c("PrName","Product.Simple")]
 
-pdata<-data.table(data_sites)[Out.SubInd == "Crop Yield" & !(is.na(Lat) & is.na(Lon)),c("Lon","Lat","RR","ID")]
-                           
 # Worldclim ####
 # Set parameters to include in analysis
 Scenarios<-c("ssp126","ssp245","ssp370","ssp585")
@@ -138,7 +144,6 @@ for(k in 1:nrow(Vars)){
         if(Year==2030){Period<-"2021-2040"}
         if(Year==2050){Period<-"2041-2060"}
     }
-    
     
     #load future climate data -----
 
