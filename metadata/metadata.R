@@ -110,18 +110,18 @@ atlas_metadata<-function(dataset.title_short="",
                         ){
         
 # Add geospatial metadata from terra objects
-if(class(Data)!="logical"){
-    try(if(!class(Data) %in% c("SpatRaster","SpatVector")) stop("Data is not a terra package SpatRaster or SpatVector object"))
-        grid.proj<-terra::crs(Data,proj=T)
-        grid.xmin<-terra::ext(Data)$xmin
-        grid.xmax<-terra::ext(Data)$xmax
-        grid.ymin<-terra::ext(Data)$ymin
-        grid.ymax<-terra::ext(Data)$ymax
+if(class(data)!="logical"){
+    try(if(!class(data) %in% c("SpatRaster","SpatVector")) stop("Data is not a terra package SpatRaster or SpatVector object"))
+        grid.proj<-terra::crs(data,proj=T)
+        grid.xmin<-terra::ext(data)$xmin
+        grid.xmax<-terra::ext(data)$xmax
+        grid.ymin<-terra::ext(data)$ymin
+        grid.ymax<-terra::ext(data)$ymax
         if(class(Data)=="SpatRaster"){
-            grid.xres<-res(Data)[1]
-            grid.yres<-res(Data)[2]
-            grid.nrow<-terra::nrow(Data)
-            grid.ncol<-terra::ncol(Data)
+            grid.xres<-res(data)[1]
+            grid.yres<-res(data)[2]
+            grid.nrow<-terra::nrow(data)
+            grid.ncol<-terra::ncol(data)
         }
         }
         
