@@ -122,7 +122,7 @@ soilstk<-lapply(Parameters,FUN=function(PAR){
 names(soilstk)<-Parameters                     
 
 #Create Scenarios x Years x Tresholds Loop ####
-Scenarios<-c("ssp126","ssp245","ssp370","ssp585")
+Scenarios<-c("ssp126","ssp245","ssp370","ssp585","baseline")
 Years<-c(2030,2050)
 Vars<-expand.grid(Years=Years,Scenarios=Scenarios)
 Vars$Scenarios<-as.character(Vars$Scenarios)
