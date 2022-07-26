@@ -3,6 +3,9 @@ require(data.table)
 require(parallel)
 require(stringr)
 require(terra)
+if(!require(analogues)){
+devtools::install_github("CIAT-DAPA/analogues")    
+}
 
 # Analysis version
 Version <- 6
@@ -45,7 +48,19 @@ MaxPracs<-1 # Max number of practices in combination to consider
 
 # Subset ERA data
 data_sites[grepl("Banana",Product.Simple),Product.Simple:="Banana"]             
-data_sites<-data_sites[(PrName == "Mulch-Reduced Tillage" | NPracs<=MaxPracs) & Product.Simple %in% IncludeProducts]
+data_sites<-data_sites[(PrName == "Mulch-Reduced Tillage" | NPracs<=MaxPracs) & Product.Simple %in% IncludeProducts
+                      ][,ID:=paste("s",1:.N,sep="")] 
+
+Y<-data_sites[RR>=Threshold &!PrName=="",
+        list(N.Sites=length(unique(Site.ID)),
+             N.Countries=length(unique(Country)),
+             N.AEZ16=length(unique(AEZ16simple))),
+        by=c("PrName","Product.Simple","Out.SubInd")
+        ][N.Sites >= MinSites]    #practice list with only two fields
+
+X<-Y[,c("PrName","Product.Simple")]
+
+pdata<-data.table(data_sites)[Out.SubInd == "Crop Yield" & !(is.na(Lat) & is.na(Lon)),c("Lon","Lat","RR","ID")]
                            
 # Worldclim ####
 # Set parameters to include in analysis
@@ -54,7 +69,7 @@ Variables<-c("tmin","tmax","prec")
 Period<-c("2021-2040","2041-2060")
 Resolution<-"2.5m"
 
-# Worldclim historic ####
+# Worldclim baseline ####
 WCDirInt<-paste0(IntDir,"worldclim/")
 
 wc_data<-lapply(Variables,FUN=function(VAR){
@@ -63,6 +78,13 @@ wc_data<-lapply(Variables,FUN=function(VAR){
       })
 
 names(wc_data)<-Variables
+
+wc_prec <- raster::stack(wc_data$prec)
+wc_tmin <- wc_data$tmin
+wc_tmax <- wc_data$tmax
+wc_tmean<-raster::stack((wc_tmin+wc_tmax)/2)
+
+rm(wc_tmin,wc_tmax)
 
 # Worldclim future####
 Var_x_Scen<-expand.grid(Variables,Scenarios,Period,Resolution)
@@ -96,82 +118,57 @@ names(soilstk)<-Parameters
 #Create Scenarios x Years x Tresholds Loop ####
 Scenarios<-c("ssp126","ssp245","ssp370","ssp585")
 Years<-c(2030,2050)
-Thresholds<-c(0.0,0.15,0.27,0.41)
-Vars<-expand.grid(Years=Years,Scenarios=Scenarios,Threshold=Thresholds)
+Vars<-expand.grid(Years=Years,Scenarios=Scenarios)
 Vars$Scenarios<-as.character(Vars$Scenarios)
-Vars<-rbind(Vars,expand.grid(Years=NA,Scenarios="baseline",Threshold=Thresholds))
+Vars<-rbind(Vars,expand.grid(Years=NA,Scenarios="baseline"))
+
+Thresholds<-c(0.0,0.15,0.27,0.41)
 
 #options
 DoNeg<-F # Produce negative suitability?
-DoLite<-T # To save time average the soil rasters across depths (rather than using multiple depths) and cut out min class and quantiles from run_points function
-                       
+DoLite<-T # To save time average the soil rasters across depths (rather than using multiple depths) and cut out min class and quantiles from run_points function         
+
 for(k in 1:nrow(Vars)){
     Scenario<-Vars$Scenarios[k]
     Year<-Vars$Years[k]
-    if(Year==2030){Period<-"2021-2040"}
-    if(Year==2050){Period<-"2041-2060"}
-    Threshold<-Vars$Threshold[k]
     
-    print(paste0("Running: Scenario = ",Vars$Scenarios[k]," | Year = ",Vars$Years[k]," | Threshold = ",Vars$Threshold[k]))
+    cat(paste0("Running: Scenario = ",Vars$Scenarios[k]," | Year = ",Vars$Years[k]))
     
-    #load monthly climate data -----
-    #climate: load baseline ####
-    wc_prec <- wc_data$prec
-    lwc_tmin <- wc_data$tmin
-    lwc_tmax <- wc_data$tmax
-    lwc_tmean<-(lwc_tmin+lwc_tmax)/2
-    rm(lwc_tmin,lwc_tmax)
+    if(!is.na(Year)){
+        if(Year==2030){Period<-"2021-2040"}
+        if(Year==2050){Period<-"2041-2060"}
+    }
     
-    #climate: load future ####
     
+    #load future climate data -----
+
     if (Scenario != 'baseline') {
-       wc_prec_fut<-wc_future_data[[paste0("prec-",Scenario,"-",Period)]]
+       wc_prec_fut<-raster::stack(wc_future_data[[paste0("prec-",Scenario,"-",Period)]])
        wc_tmin_fut<-wc_future_data[[paste0("tmin-",Scenario,"-",Period)]]
        wc_tmax_fut<-wc_future_data[[paste0("tmax-",Scenario,"-",Period)]]
-       wc_tmean_fut<-(wc_tmin_fut+wc_tmax_fut)/2
+       wc_tmean_fut<-raster::stack((wc_tmin_fut+wc_tmax_fut)/2)
         
        rm(wc_tmin_fut,wc_tmax_fut)
        }    
     
-    ############################################################
-    ############################################################
-    #select practice and organize practice data -----
+   # For each point calculate climate analogue-----
     
-    #calculate similarity (both temp and precip for positive sites) - Function -----
-    #adjust so that for each site
-    #1. similarity for mean climate
-    #2. similarity for each soil variable
-    #3. combine all in a sensible layer and save individual layers and output as .RData
-    
-    #Subset Era Data ====
-    Y<-data_sites[RR>=Threshold &!PrName=="",
-            list(N.Sites=length(unique(Site.ID)),
-                 N.Countries=length(unique(Country)),
-                 N.AEZ16=length(unique(AEZ16simple))),
-            by=c("PrName","Product.Simple","Out.SubInd")
-            ][N.Sites >= MinSites]    #practice list with only two fields
-    
-    X<-Y[,c("PrName","Product.Simple")]
-             
-    #run in parallel if 1 practice or more
-    if(nrow(X)>0){
-        xres <- parallel::mclapply(1:nrow(X), 
-                                   run_points, 
-                                   pr_df = X, 
-                                   ERA_data = data_sites, 
-                                   cimdir = cimdir, 
-                                   Threshold =  Threshold, 
-                                   Year =  Year, 
-                                   Scenario =  Scenario, 
-                                   vr = Version, 
-                                   etype = "pos", 
-                                   DoLite = DoLite,
-                                   mc.cores = Cores, 
-                                   mc.preschedule = FALSE,
-                                   Outcome = "Crop Yield")
-    }
-
+     parallel::mclapply(1:nrow(pdata), 
+                        run_points_climate, 
+                        Data=pdata, 
+                        cimdir, 
+                        Year, 
+                        Scenario, 
+                        vr=Version,
+                        wc_prec=wc_prec,
+                        wc_tmean=wc_tmean,
+                        wc_prec_fut=if(is.na(Year)){wc_prec}else{wc_prec_fut},
+                        wc_tmean_fut=if(is.na(Year)){wc_tmean}else{wc_tmean_fut},
+                        mc.cores = Cores, 
+                        mc.preschedule = FALSE)
+         
     #clean-up
-    rm(X,Y)
     gc()
 }
+
+

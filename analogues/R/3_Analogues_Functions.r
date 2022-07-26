@@ -20,7 +20,7 @@
                         ][,ID:=paste("s",1:.N,sep="")]
         
         #output directory  =====
-        pr_odir <- paste(cimdir,"/T",Threshold,"_v",vr,"/",Product,"/",Year,"/",gsub("[.]","_",Scenario),"/",gsub(" ", "_", Practice, fixed=T),"_v",vr,sep="")
+        pr_odir <- paste(cimdir,"T",Threshold,"_v",vr,"/",Product,"/",Year,"/",gsub("[.]","_",Scenario),"/",gsub(" ", "_", Practice, fixed=T),"_v",vr,sep="")
         if (!file.exists(pr_odir)) {dir.create(pr_odir,recursive=T)}
         
         #verbose what i'm running
@@ -33,11 +33,19 @@
           if (!file.exists(paste(pr_odir,"/out_",etype,"_",in_data$ID[j],".RData",sep=""))) {
             #1. mean climate ####
             #cat("...mean climate\n")
-            par1 <- createParameters(x=in_data$Lon[j], y=in_data$Lat[j], vars=c("prec","tmean"),weights=c(0.75,0.25),
-                                     ndivisions=c(12,12),growing.season=c(1,12),
-                                     rotation="prec",threshold=1,env.data.ref=list(wc_prec,wc_tmean), 
-                                     env.data.targ=if(is.na(Year)){list(wc_prec,wc_tmean)}else{list(wc_prec_fut,wc_tmean_fut)},outfile=pr_odir,
-                                     fname=NA,writefile=F)
+            par1 <- analogues::createParameters(x=in_data$Lon[j], 
+                                                y=in_data$Lat[j], 
+                                                vars=c("prec","tmean"),
+                                                weights=c(0.75,0.25),
+                                                ndivisions=c(12,12),
+                                                growing.season=c(1,12),
+                                                rotation="prec",
+                                                threshold=1,
+                                                env.data.ref=list(wc_prec,wc_tmean), 
+                                                env.data.targ=if(is.na(Year)){list(wc_prec,wc_tmean)}else{list(wc_prec_fut,wc_tmean_fut)},
+                                                outfile=pr_odir,
+                                                fname=NA,
+                                                writefile=F)
             sim1 <- calc_similarity(par1)
             if (!inMemory(sim1)) {sim1 <- readAll(sim1)}
             
@@ -47,11 +55,19 @@
             for (svar in c("CLYPPT","ORCDRC")) {
                 #print(svar)
                 if(!DoLite){soil_data <- stack(soilstk[[svar]])} else {soil_data <- soilstk2[[svar]]}
-                parx <- createParameters(x=in_data$Lon[j], y=in_data$Lat[j], vars=c(svar),weights=1,
-                                         ndivisions=c(3),growing.season=c(1,3),rotation="none",
-                                         threshold=1,env.data.ref=list(soil_data), 
-                                         env.data.targ=list(soil_data),outfile=pr_odir,
-                                         fname=NA,writefile=F)
+                parx <- createParameters(x=in_data$Lon[j], 
+                                         y=in_data$Lat[j], 
+                                         vars=c(svar),
+                                         weights=1,
+                                         ndivisions=c(3),
+                                         growing.season=c(1,3),
+                                         rotation="none",
+                                         threshold=1,
+                                         env.data.ref=list(soil_data), 
+                                         env.data.targ=list(soil_data),
+                                         outfile=pr_odir,
+                                         fname=NA,
+                                         writefile=F)
                 simsol <- c(simsol,calc_similarity(parx))
             }
             sim2a <- simsol[[1]]
@@ -175,3 +191,38 @@
         #return object
         return(maxsim)
     }
+
+
+ run_points_climate <- function(Index,Data, cimdir, Year, Scenario, vr,cores,wc_prec,wc_tmean,wc_prec_fut,wc_tmean_fut) {
+                   
+        data <- Data[Index] 
+               
+        #output directory  =====
+        pr_odir <- paste0(cimdir,"v",vr,"/Climate/",Year,"/",gsub("[.]","_",Scenario))
+        if (!file.exists(pr_odir)) {dir.create(pr_odir,recursive=T)}
+        
+        #verbose what i'm running
+        cat('\r                                 ')
+        cat("Processing ", Index, "of", nrow(Data))
+        flush.console()
+
+        #loop through points 
+     if(!file.exists(paste0(pr_odir,"/",Data$ID[Index],".tif"))){
+         par1 <- analogues::createParameters(x=Data$Lon[Index], 
+                                            y=Data$Lat[Index], 
+                                            vars=c("prec","tmean"),
+                                            weights=c(0.75,0.25),
+                                            ndivisions=c(12,12),
+                                            growing.season=c(1,12),
+                                            rotation="prec",
+                                            threshold=1,
+                                            env.data.ref=list(wc_prec,wc_tmean), 
+                                            env.data.targ=list(wc_prec_fut,wc_tmean_fut),
+                                            outfile=pr_odir,
+                                            fname=Data$ID[Index],
+                                            writefile=F)
+        X<-calc_similarity(par1)
+        terra::writeRaster(X,paste0(pr_odir,"/",Data$ID[Index],".tif"),overwrite=T)
+         }
+}
+            
