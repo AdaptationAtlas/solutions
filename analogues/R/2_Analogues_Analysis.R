@@ -111,16 +111,16 @@ names(wc_future_data)<-apply(Var_x_Scen[,1:3],1,paste,collapse="-")
 # Soilgrids ####
 SoilIntDir<-paste0(IntDir,"soilgrids/")
 
-#Parameters<-c("bdod","cec","clay","sand","silt","soc","phh2o")
-Parameters<-c("sand","phh2o")
+SoilPars<-c("bdod","cec","clay","sand","silt","soc","phh2o")
+#Parameters<-c("sand","phh2o")
 Depths<-c("0-5","5-15","15-30","30-60","60-100")
 
-soilstk<-lapply(Parameters,FUN=function(PAR){
+soilstk<-lapply(SoilPars,FUN=function(PAR){
     File<-paste0(SoilIntDir,PAR,".tif")    
     terra::rast(File)
 })
 
-names(soilstk)<-Parameters                     
+names(soilstk)<-SoilPars                     
 
 #Create Scenarios x Years x Tresholds Loop ####
 Scenarios<-c("ssp126","ssp245","ssp370","ssp585")
@@ -134,7 +134,6 @@ Thresholds<-c(0.0,0.15,0.27,0.41)
 #options
 DoNeg<-F # Produce negative suitability?
 DoLite<-T # To save time average the soil rasters across depths (rather than using multiple depths) and cut out min class and quantiles from run_points function         
-
 for(k in 1:nrow(Vars)){
     Scenario<-Vars$Scenarios[k]
     Year<-Vars$Years[k]
@@ -187,6 +186,21 @@ for(k in 1:nrow(Vars)){
          
     #clean-up
     gc()
+    
+    SaveDir <- paste0(cimdir,"v",Version,"/Soils")
+    if(!dir.exists(SaveDir)){
+        dir.create(SaveDir,recursive=T)
+    }
+         
+    parallel::mclapply(1:nrow(pdata),
+                       run_points_soil,
+                       Data=pdata,
+                       SaveDir,     
+                       soilstk,
+                       Verbose=F,
+                       DoAll=F,
+                       mc.cores = Cores, 
+                       mc.preschedule = FALSE)
 }
 
 
