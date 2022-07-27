@@ -2,7 +2,7 @@
 #' 
 #' @export
 #' @importFrom raster extract
- run_points_climate <- function(Index,Data, SaveDir, Year, Scenario, vr,cores,wc_prec,wc_tmean,wc_prec_fut,wc_tmean_fut,Verbose=F) {
+ run_points_climate <- function(Index,Data, SaveDir, cores,wc_prec,wc_tmean,wc_prec_fut,wc_tmean_fut,Verbose=F) {
      data <- Data[Index] 
 
      #verbose what i'm running

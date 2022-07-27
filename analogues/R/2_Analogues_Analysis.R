@@ -162,20 +162,21 @@ for(k in 1:nrow(Vars)){
     
     #output directory  =====
     if(Scenario=="baseline"){
-        SaveDir <- paste0(cimdir,"v",vr,"/Climate/baseline")
+        SaveDir <- paste0(cimdir,"v",Version,"/Climate/baseline")
     }else{
-        SaveDir <- paste0(cimdir,"v",vr,"/Climate/",Year,"/",gsub("[.]","_",Scenario))
+        SaveDir <- paste0(cimdir,"v",Version,"/Climate/",Year,"/",gsub("[.]","_",Scenario))
       }  
+    
+    if(!dir.exists(SaveDir)){
+        dir.create(SaveDir,recursive=T)
+        }
 
    # For each point calculate climate analogue-----
     
-     parallel::mclapply(1:nrow(pdata), 
+     parallel::mclapply(1:nrow(pdata),
                         run_points_climate, 
                         Data=pdata, 
                         SaveDir=SaveDir, 
-                        Year=Year, 
-                        Scenario=Scenario, 
-                        vr=Version,
                         wc_prec=wc_prec,
                         wc_tmean=wc_tmean,
                         wc_prec_fut=wc_prec_fut,
