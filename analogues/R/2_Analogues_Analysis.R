@@ -59,6 +59,7 @@ data_sites<-data_sites[(PrName == "Mulch-Reduced Tillage" | NPracs<=MaxPracs) & 
 
 pdata<-unique(data.table(data_sites)[Out.SubInd == "Crop Yield" & !(is.na(Lat) & is.na(Lon)),c("Lon","Lat","ID")])
 
+Threshold<-0
 Y<-data_sites[RR>=Threshold &!PrName=="",
         list(N.Sites=length(unique(Site.ID)),
              N.Countries=length(unique(Country)),
@@ -122,7 +123,7 @@ soilstk<-lapply(Parameters,FUN=function(PAR){
 names(soilstk)<-Parameters                     
 
 #Create Scenarios x Years x Tresholds Loop ####
-Scenarios<-c("ssp126","ssp245","ssp370","ssp585","baseline")
+Scenarios<-c("ssp126","ssp245","ssp370","ssp585")
 Years<-c(2030,2050)
 Vars<-expand.grid(Years=Years,Scenarios=Scenarios)
 Vars$Scenarios<-as.character(Vars$Scenarios)
@@ -154,21 +155,32 @@ for(k in 1:nrow(Vars)){
        wc_tmean_fut<-raster::stack((wc_tmin_fut+wc_tmax_fut)/2)
         
        rm(wc_tmin_fut,wc_tmax_fut)
-       }    
+    }else{
+        wc_prec_fut<-wc_prec
+        wc_tmean_fut<-wc_tmean
+    }
     
+    #output directory  =====
+    if(Scenario=="baseline"){
+        SaveDir <- paste0(cimdir,"v",vr,"/Climate/baseline")
+    }else{
+        SaveDir <- paste0(cimdir,"v",vr,"/Climate/",Year,"/",gsub("[.]","_",Scenario))
+      }  
+
    # For each point calculate climate analogue-----
     
      parallel::mclapply(1:nrow(pdata), 
                         run_points_climate, 
                         Data=pdata, 
-                        cimdir, 
-                        Year, 
-                        Scenario, 
+                        SaveDir=SaveDir, 
+                        Year=Year, 
+                        Scenario=Scenario, 
                         vr=Version,
                         wc_prec=wc_prec,
                         wc_tmean=wc_tmean,
-                        wc_prec_fut=if(is.na(Year)){wc_prec}else{wc_prec_fut},
-                        wc_tmean_fut=if(is.na(Year)){wc_tmean}else{wc_tmean_fut},
+                        wc_prec_fut=wc_prec_fut,
+                        wc_tmean_fut=wc_tmean_fut,
+                        Verbose=F,
                         mc.cores = Cores, 
                         mc.preschedule = FALSE)
          

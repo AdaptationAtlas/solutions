@@ -227,8 +227,8 @@ if(!dir.exists(SoilIntDir)){
     dir.create(SoilIntDir)
     }
                                     
-#Parameters<-c("bdod","cec","clay","sand","silt","soc","phh2o")
-Parameters<-c("sand","phh2o")
+Parameters<-c("bdod","cec","clay","sand","silt","soc","phh2o")
+#Parameters<-c("sand","phh2o")
 Depths<-c("0-5","5-15","15-30","30-60","60-100")
 
 # NOTE TERRA CAN SIMPLY SAVE THE ENTIRE STACK USING WRITE RASTER!
