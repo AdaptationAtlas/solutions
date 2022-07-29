@@ -15,7 +15,7 @@ devtools::install_github("CIAT-DAPA/analogues")
 }
 
 # Functions
-source("R/3_Analogues_Functions.R")
+source("R/2.1_Analogues_Functions.R")
 
 # Parameters ####
 # Analysis version
@@ -27,13 +27,14 @@ Cores<-parallel::detectCores()-1
 # Run full or streamlined analysis?
 DoLite<-T
 
-
 # Set save location of intermediate datasets
 IntDir<-"/home/jovyan/common_data/atlas/interim/"
 
 # Create analysis save folder
 cimdir <- paste0(IntDir,"analogues/")
-
+if(!dir.exists(paste0(cimdir,"v",Version)){
+    dir.create(paste0(cimdir,"v",Version),recursive=T)
+}
 # Africa map ####
 BoundIntDir<-paste0(IntDir,"0_boundaries/")
 sh_africa<-terra::vect(paste0(BoundIntDir,"gadml0_4326_agg.shp"))
@@ -44,30 +45,20 @@ msk<-terra::rast(paste0(IntDir,"0_boundaries/msk.tif"))
 # ERA ####
 data_sites<-data.table::fread(paste0(cimdir,"analogues_ERA.csv"))
 
-# Exclude products
+# Products tp include
 # Link to MapSPAM names?
 
 IncludeProducts<-c("Sorghum","Groundnut","Pearl Millet","Maize","Cotton","Wheat","Cowpea","Tomato","Cassava","Pigeon Pea","Rice","Soybean","Chickpea","Sunflower","Arabica","Peas","Common Bean","Sweet Potato","Banana","Robusta","Rape","Yam","Potato","Tea","Barley","Fava Bean","Canola")
 
-MinSites<-1
-MaxPracs<-1 # Max number of practices in combination to consider
-
 # Subset ERA data
+   # Consider moving all subsetting to combine analogues script
 data_sites[grepl("Banana",Product.Simple),Product.Simple:="Banana"]             
 data_sites<-data_sites[(PrName == "Mulch-Reduced Tillage" | NPracs<=MaxPracs) & Product.Simple %in% IncludeProducts
                       ][,ID:=paste0("s",Lat,"_",Lon)] 
 
+data.table::fwrite(data_sites,paste0(cimdir,"v",Version,"/analogues_ERA.csv"))
+
 pdata<-unique(data.table(data_sites)[Out.SubInd == "Crop Yield" & !(is.na(Lat) & is.na(Lon)),c("Lon","Lat","ID")])
-
-Threshold<-0
-Y<-data_sites[RR>=Threshold &!PrName=="",
-        list(N.Sites=length(unique(Site.ID)),
-             N.Countries=length(unique(Country)),
-             N.AEZ16=length(unique(AEZ16simple))),
-        by=c("PrName","Product.Simple","Out.SubInd")
-        ][N.Sites >= MinSites]    #practice list with only two fields
-
-X<-Y[,c("PrName","Product.Simple")]
 
 # Worldclim ####
 # Set parameters to include in analysis
@@ -122,18 +113,16 @@ soilstk<-lapply(SoilPars,FUN=function(PAR){
 
 names(soilstk)<-SoilPars                     
 
-#Create Scenarios x Years x Tresholds Loop ####
+# Calculate climate analogues ####
+
+# Set scenarios and timescales
 Scenarios<-c("ssp126","ssp245","ssp370","ssp585")
 Years<-c(2030,2050)
 Vars<-expand.grid(Years=Years,Scenarios=Scenarios)
 Vars$Scenarios<-as.character(Vars$Scenarios)
 Vars<-rbind(Vars,expand.grid(Years=NA,Scenarios="baseline"))
+data.table::fwrite(Vars,paste0(cimdir,"v",Version,"/scenarios_x_years.csv"))
 
-Thresholds<-c(0.0,0.15,0.27,0.41)
-
-#options
-DoNeg<-F # Produce negative suitability?
-DoLite<-T # To save time average the soil rasters across depths (rather than using multiple depths) and cut out min class and quantiles from run_points function         
 for(k in 1:nrow(Vars)){
     Scenario<-Vars$Scenarios[k]
     Year<-Vars$Years[k]
@@ -161,9 +150,9 @@ for(k in 1:nrow(Vars)){
     
     #output directory  =====
     if(Scenario=="baseline"){
-        SaveDir <- paste0(cimdir,"v",Version,"/Climate/baseline")
+        SaveDir <- paste0(cimdir,"v",Version,"/baseline")
     }else{
-        SaveDir <- paste0(cimdir,"v",Version,"/Climate/",Year,"/",gsub("[.]","_",Scenario))
+        SaveDir <- paste0(cimdir,"v",Version,"/",Year,"/",gsub("[.]","_",Scenario))
       }  
     
     if(!dir.exists(SaveDir)){
@@ -186,21 +175,21 @@ for(k in 1:nrow(Vars)){
          
     #clean-up
     gc()
-    
-    SaveDir <- paste0(cimdir,"v",Version,"/Soils")
-    if(!dir.exists(SaveDir)){
-        dir.create(SaveDir,recursive=T)
-    }
-         
-    parallel::mclapply(1:nrow(pdata),
-                       run_points_soil,
-                       Data=pdata,
-                       SaveDir,     
-                       soilstk,
-                       Verbose=F,
-                       DoAll=F,
-                       mc.cores = Cores, 
-                       mc.preschedule = FALSE)
+ 
 }
 
+# Calculate soil analagues ####
+SaveDir <- paste0(cimdir,"v",Version)
+if(!dir.exists(SaveDir)){
+    dir.create(SaveDir,recursive=T)
+}
 
+parallel::mclapply(1:nrow(pdata),
+                   run_points_soil,
+                   Data=pdata,
+                   SaveDir,     
+                   soilstk,
+                   Verbose=F,
+                   DoAll=T,
+                   mc.cores = Cores, 
+                   mc.preschedule = FALSE)
