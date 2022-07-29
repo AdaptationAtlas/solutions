@@ -115,7 +115,7 @@
 #' @export
 #' @importFrom terra rast writeRaster
 #' @import data.table
-combine_analogues<-function(Index,Combinations,SaveDir,overwrite,cimdir,Version){
+combine_analogues<-function(Index,Data,Combinations,SaveDir,overwrite,cimdir,SoilDir,gamma){
     Practice<-Combinations[Index,PrName]
     Product<-Combinations[Index,Product.Simple]
     Outcome<-Combinations[Index,Out.SubInd]
@@ -125,18 +125,22 @@ combine_analogues<-function(Index,Combinations,SaveDir,overwrite,cimdir,Version)
     
     FileName<-gsub(" ","_",paste0(c(paste0("t",Threshold),Year,Scenario,Practice,Product,Outcome),collapse="-"))
     
+    if(!dir.exists(SaveDir)){
+        dir.create(SaveDir,recursive=T)
+    }
+
     if((!file.exists(paste0(SaveDir,"/",FileName,"_maxsim.tif")))|overwrite==T){
-        ClimDir<-paste0(cimdir,"v",Version,"/",Year,"_",Scenario)
+        ClimDir<-paste0(cimdir,"/",Year,"_",Scenario)
     
     if(Threshold=="all"){
-        IDs<-data_sites[PrName==Practice & Product.Simple==Product & Out.SubInd==Outcome,unique(ID)]
+        IDs<-Data[PrName==Practice & Product.Simple==Product & Out.SubInd==Outcome,unique(ID)]
     }else{
         if(!grepl("m",Threshold)){
             Threshold<-as.numeric(Threshold)
-            IDs<-data_sites[PrName==Practice & Product.Simple==Product & Out.SubInd==Outcome & RR.pc.jen>=Threshold,unique(ID)]
+            IDs<-Data[PrName==Practice & Product.Simple==Product & Out.SubInd==Outcome & RR.pc.jen>=Threshold,unique(ID)]
         }else{
             Threshold<-as.numeric(gsub("m","-",Threshold))
-            IDs<-data_sites[PrName==Practice & Product.Simple==Product & Out.SubInd==Outcome & RR.pc.jen<=Threshold,unique(ID)]
+            IDs<-Data[PrName==Practice & Product.Simple==Product & Out.SubInd==Outcome & RR.pc.jen<=Threshold,unique(ID)]
          }            
     }
 
@@ -154,7 +158,6 @@ combine_analogues<-function(Index,Combinations,SaveDir,overwrite,cimdir,Version)
             }))
             
             maxsim <- max(allstk, na.rm=TRUE)
-            gamma <- 0.5
             fsim <- max(simclim, na.rm=TRUE)^(1-gamma) * max(simsol, na.rm=TRUE)^gamma
         }else{         
             maxsim<-max(c(simclim,simsol), na.rm=TRUE)
@@ -164,7 +167,8 @@ combine_analogues<-function(Index,Combinations,SaveDir,overwrite,cimdir,Version)
         
     suppressWarnings(terra::writeRaster(maxsim,paste0(SaveDir,"/",FileName,"_maxsim.tif"),overwrite=T))
     suppressWarnings(terra::writeRaster(fsim,paste0(SaveDir,"/",FileName,"_fsim.tif"),overwrite=T))
-                         
+    FileName
+                       
        }
     }
     

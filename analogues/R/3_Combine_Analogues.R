@@ -7,45 +7,42 @@ if(substr(getwd(),nchar(getwd())-1,nchar(getwd()))=="/R"){
 # Packages & functions ####
 require(terra)
 require(data.table)
+require(parallel)
 source("R/2.1_Analogues_Functions.R")
 
-
 # Set number ofcores for parallel processing
-Cores<-10
+Cores<-parallel::detectCores(logical=T)-1
 
 # Analysis version
 Version <- 6
 
-# Set save location of intermediate datasets
+# Create folder for interim analysis files
 IntDir<-"/home/jovyan/common_data/atlas/interim/"
+cimdir_vr<-paste0(IntDir,"analogues_v",Version)
+if(!dir.exists(cimdir_vr)){
+    dir.create(cimdir_vr,recursive=T)
+}
 
-# Create analysis save folder
-cimdir <- paste0(IntDir,"analogues/")
+# Options
 
-
-#options
-DoNeg<-F # Produce negative suitability?
-DoLite<-T # To save time average the soil rasters across depths (rather than using multiple depths) and cut out min class and quantiles from run_points function     
-
-SxY<-data.table::fread(paste0(cimdir,"v",Version,"/scenarios_x_years.csv"))
-
-
+# Min number of sites per practice
 MinSites<-1
-MaxPracs<-1 # Max number of practices in combination to consider
+# Max number of practices in combination to consider
+MaxPracs<-1 
 
-data_sites<-data.table::fread(paste0(cimdir,"v",Version,"/analogues_ERA.csv"))
+# Load analyzed ERA data from script 1 ####
+data_sites<-data.table::fread(paste0(cimdir_vr,"/analogues_ERA.csv"))
 
-
-i<-1
-
+# Subset data according to option values
 Y<-data_sites[PrName!="",c("N.Sites","N.Countries","N.AEZ16"):=list(length(unique(Site.ID)),length(unique(Country)),length(unique(AEZ16simple))),
         by=c("PrName","Product.Simple","Out.SubInd")
-        ][N.Sites >= MinSites]    #practice list with only two fields
+        ][N.Sites >= MinSites
+         ][(PrName == "Mulch-Reduced Tillage" | NPracs<=MaxPracs)]    
 
 
 X<-unique(Y[,list(PrName,Product.Simple,Out.SubInd,N.Sites,N.Countries)])
 
-# Set scenarios and timescales
+# Generate combinations of scenarios, timescales, yield thresholds ####
 Scenarios<-c("ssp126","ssp245","ssp370","ssp585")
 Years<-c(2030,2050)
 Thresholds<-c("all","m50","m25","m10",0,10,25,50) # Percentage increase in yield
@@ -53,22 +50,67 @@ Vars<-expand.grid(Years=Years,Scenarios=Scenarios,Thresholds=Thresholds)
 Vars$Scenarios<-as.character(Vars$Scenarios)
 Vars<-rbind(Vars,expand.grid(Years=NA,Scenarios="baseline",Thresholds=Thresholds))
 
-Combinations<-data.table(Vars[rep(1:nrow(Vars),each=nrow(X)),],X[rep(1:nrow(X),nrow(Vars))])
+# Repeat scen x time x threshold combinations for each product x practice x outcome from ERA and combine two datasets
+Combinations<-data.table(Vars[rep(1:nrow(Vars),each=nrow(X)),],X[rep(1:nrow(X),nrow(Vars))]) 
+                                                                 
+if(F){
+    lapply(Combinations[,which(!N.Sites>=5)],FUN=function(i){
+    combine_analogues(Index=i,
+                      Data=data_sites,
+                      Combinations=Combinations,
+                      SaveDir=paste0(cimdir_vr,"/results"),
+                      overwrite=F,
+                      cimdir=cimdir_vr,
+                      gamma=0.5,
+                      SoilDir=paste0(cimdir_vr,"/all"))
+    })
+    }
 
-SoilDir<-paste0(cimdir,"v",Version,"/all")
-SaveDir<-paste0(cimdir,"v",Version,"/results")
-if(!dir.exists(SaveDir)){
-    dir.create(SaveDir,recursive=T)
+# Split processing between practices x crops with less and more data. Inorganic fertilizer requires stacking 327 rasters and uses up a LOT of ram.
+
+# Practices x crops with less than 100 sites
+CombosA<-Combinations[!N.Sites>=100][409:418]
+
+# Update to future::apply at some point
+if(F){
+    library(future.apply)
+    plan(multisession, workers = Cores)
+
+ future.apply::future_lapply(Combinations[,which(!N.Sites>=100)],
+                    combine_analogues, 
+                    Data=data_sites,
+                    Combinations=Combinations, 
+                    SaveDir=paste0(cimdir_vr,"/results"), 
+                    overwrite=F,
+                    cimdir=cimdir_vr,
+                    gamma=0.5,
+                    SoilDir=paste0(cimdir_vr,"/all"),
+                    future.seed=T
+                    ) 
 }
 
- parallel::mclapply(1:nrow(Combinations),
+ parallel::mclapply(Combinations[,which(!N.Sites>=100)],
                     combine_analogues, 
+                    Data=data_sites,
                     Combinations=Combinations, 
-                    SaveDir=SaveDir, 
+                    SaveDir=paste0(cimdir_vr,"/results"), 
                     overwrite=F,
-                    cimdir=cimdir,
-                    Version=Version,   
-                    mc.cores = Cores, 
+                    cimdir=cimdir_vr,
+                    gamma=0.5,
+                    SoilDir=paste0(cimdir_vr,"/all"),  
+                    mc.cores = Cores*2, 
+                    mc.preschedule = FALSE)
+
+ # Practices x crops with 100+ sites
+ parallel::mclapply(1:nrow(Combinations[N.Sites>=100]),
+                    combine_analogues, 
+                    Data=data_sites,
+                    Combinations=Combinations[Combinations[N.Sites>=100]], 
+                    SaveDir=paste0(cimdir_vr,"/results"), 
+                    overwrite=F,
+                    cimdir=cimdir_vr,
+                    gamma=0.5,
+                    SoilDir=paste0(cimdir_vr,"/all"),  
+                    mc.cores = 5, 
                     mc.preschedule = FALSE)
         
-

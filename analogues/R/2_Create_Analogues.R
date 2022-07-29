@@ -18,9 +18,6 @@ devtools::install_github("CIAT-DAPA/analogues")
 source("R/2.1_Analogues_Functions.R")
 
 # Parameters ####
-# Analysis version
-Version <- 6
-
 # Set number ofcores for parallel processing
 Cores<-parallel::detectCores()-1
 
@@ -30,10 +27,14 @@ DoLite<-T
 # Set save location of intermediate datasets
 IntDir<-"/home/jovyan/common_data/atlas/interim/"
 
-# Create analysis save folder
+# Analysis version
+Version <- 6
+
+# Create folder for interim analysis files
 cimdir <- paste0(IntDir,"analogues/")
-if(!dir.exists(paste0(cimdir,"v",Version)){
-    dir.create(paste0(cimdir,"v",Version),recursive=T)
+cimdir_vr<-paste0(IntDir,"analogues_v",Version)
+if(!dir.exists(cimdir_vr)){
+    dir.create(cimdir_vr,recursive=T)
 }
 # Africa map ####
 BoundIntDir<-paste0(IntDir,"0_boundaries/")
@@ -53,10 +54,10 @@ IncludeProducts<-c("Sorghum","Groundnut","Pearl Millet","Maize","Cotton","Wheat"
 # Subset ERA data
    # Consider moving all subsetting to combine analogues script
 data_sites[grepl("Banana",Product.Simple),Product.Simple:="Banana"]             
-data_sites<-data_sites[(PrName == "Mulch-Reduced Tillage" | NPracs<=MaxPracs) & Product.Simple %in% IncludeProducts
+data_sites<-data_sites[Product.Simple %in% IncludeProducts
                       ][,ID:=paste0("s",Lat,"_",Lon)] 
 
-data.table::fwrite(data_sites,paste0(cimdir,"v",Version,"/analogues_ERA.csv"))
+data.table::fwrite(data_sites,paste0(cimdir_vr,"/analogues_ERA_subset.csv"))
 
 pdata<-unique(data.table(data_sites)[Out.SubInd == "Crop Yield" & !(is.na(Lat) & is.na(Lon)),c("Lon","Lat","ID")])
 
@@ -121,7 +122,7 @@ Years<-c(2030,2050)
 Vars<-expand.grid(Years=Years,Scenarios=Scenarios)
 Vars$Scenarios<-as.character(Vars$Scenarios)
 Vars<-rbind(Vars,expand.grid(Years=NA,Scenarios="baseline"))
-data.table::fwrite(Vars,paste0(cimdir,"v",Version,"/scenarios_x_years.csv"))
+data.table::fwrite(Vars,paste0(cimdir_vr,"/scenarios_x_years.csv"))
 
 for(k in 1:nrow(Vars)){
     Scenario<-Vars$Scenarios[k]
@@ -150,9 +151,9 @@ for(k in 1:nrow(Vars)){
     
     #output directory  =====
     if(Scenario=="baseline"){
-        SaveDir <- paste0(cimdir,"v",Version,"/baseline")
+        SaveDir <- paste0(cimdir_vr,"/baseline")
     }else{
-        SaveDir <- paste0(cimdir,"v",Version,"/",Year,"/",gsub("[.]","_",Scenario))
+        SaveDir <- paste0(cimdir_vr,"/",Year,"/",gsub("[.]","_",Scenario))
       }  
     
     if(!dir.exists(SaveDir)){
@@ -179,15 +180,10 @@ for(k in 1:nrow(Vars)){
 }
 
 # Calculate soil analagues ####
-SaveDir <- paste0(cimdir,"v",Version)
-if(!dir.exists(SaveDir)){
-    dir.create(SaveDir,recursive=T)
-}
-
 parallel::mclapply(1:nrow(pdata),
                    run_points_soil,
                    Data=pdata,
-                   SaveDir,     
+                   SaveDir=cimdir_vr,     
                    soilstk,
                    Verbose=F,
                    DoAll=T,

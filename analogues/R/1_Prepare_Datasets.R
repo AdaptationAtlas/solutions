@@ -6,10 +6,21 @@ require(Hmisc)
 require(lmerTest)
 require(stats)
 
+
 # Set save location of intermediate datasets
 IntDir<-"/home/jovyan/common_data/atlas/interim/"
 if(!dir.exists(IntDir)){
     dir.create(IntDir,recursive=T)
+    }
+
+# Analysis version
+Version <- 6
+
+# Create folder for interim analysis files
+cimdir_vr <- paste0(IntDir,"analogues_v",Version)
+
+if(!dir.exists(cimdir_vr)){
+dir.create(cimdir_vr)
     }
 
 # Set save location of raw datasets
@@ -296,15 +307,9 @@ data_sites<-ERAAnalyze(Data=data.table::copy(ERAPrepared),Aggregate.By=agg_by,rm
 
 data_sites<-data_sites[,Label:=paste(Site.ID, PrName)
                       ][!(is.na(Latitude) | is.na(Longitude))
-                       ][,NPracs:=stringr::str_count(PrName, "-")
+                       ][,NPracs:=stringr::str_count(PrName, "-")+1
                         ][!PrName=="" & !Product.Simple=="" & Product.Type!="Plant Product"
                          ][,Product.Simple:=as.character(Product.Simple)]
-
-cimdir <- paste0(IntDir,"analogues/")
-
-if(!dir.exists(cimdir)){
-dir.create(cimdir)
-    }
 
 # Cleanup any data points outside mask
 data.table::setnames(data_sites,c("Longitude","Latitude"),c("Lon","Lat"))
@@ -314,4 +319,4 @@ data_sites<-data_sites[,isvalid:=terra::extract(msk, data_sites[,c("Lon","Lat")]
                        ][,isvalid:=NULL]
 
 # Save ERA dataset
-data.table::fwrite(data_sites,paste0(cimdir,"/analogues_ERA.csv"))
+data.table::fwrite(data_sites,paste0(cimdir_vr,"/analogues_ERA.csv"))
