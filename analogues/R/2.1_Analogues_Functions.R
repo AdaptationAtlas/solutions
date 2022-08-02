@@ -174,7 +174,7 @@ combine_analogues<-function(Index,Data,Combinations,SaveDir,overwrite,cimdir,Soi
         }else{      
             maxsim<-min(c(simclim,simsol), na.rm=TRUE)
             gamma <- 0.5
-            fsi`m <- simclim^(1-gamma) * simsol^gamma
+            fsim <- simclim^(1-gamma) * simsol^gamma
      }
         
     suppressWarnings(terra::writeRaster(maxsim,paste0(SaveDir,"/",FileName,"-",length(IDs),"-maxsim.tif"),overwrite=T))
