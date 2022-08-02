@@ -7,7 +7,7 @@ if(substr(getwd(),nchar(getwd())-1,nchar(getwd()))=="/R"){
 # Packages & functions ####
 require(terra)
 require(data.table)
-require(parallel)
+require(future.apply)
 source("R/2.1_Analogues_Functions.R")
 
 # Set number ofcores for parallel processing
@@ -16,12 +16,8 @@ Cores<-parallel::detectCores(logical=T)-1
 # Analysis version
 Version <- 6
 
-# Create folder for interim analysis files
-IntDir<-"/home/jovyan/common_data/atlas/interim/"
-cimdir_vr<-paste0(IntDir,"analogues_v",Version)
-if(!dir.exists(cimdir_vr)){
-    dir.create(cimdir_vr,recursive=T)
-}
+# Location of interim analysis files
+cimdir_vr<-paste0("/home/jovyan/common_data/atlas_analogues/intermediate/v",Version)
 
 # Options
 
@@ -39,6 +35,7 @@ Y<-data_sites[PrName!="",c("N.Sites","N.Countries","N.AEZ16"):=list(length(uniqu
         ][N.Sites >= MinSites
          ][(PrName == "Mulch-Reduced Tillage" | NPracs<=MaxPracs)]    
 
+data.table::fwrite(Y,paste0(cimdir_vr,"/analogues_ERA_subset.csv"))
 
 X<-unique(Y[,list(PrName,Product.Simple,Out.SubInd,N.Sites,N.Countries)])
 
@@ -52,9 +49,13 @@ Vars<-rbind(Vars,expand.grid(Years=NA,Scenarios="baseline",Thresholds=Thresholds
 
 # Repeat scen x time x threshold combinations for each product x practice x outcome from ERA and combine two datasets
 Combinations<-data.table(Vars[rep(1:nrow(Vars),each=nrow(X)),],X[rep(1:nrow(X),nrow(Vars))]) 
-                                                                 
+
+data.table::fwrite(Combinations,paste0(cimdir_vr,"/analogues_combinations.csv"))
+
+# lapply version of function for debugging                                                                 
 if(F){
-    lapply(Combinations[,which(!N.Sites>=5)],FUN=function(i){
+    lapply(Combinations,FUN=function(i){
+    print(i)
     combine_analogues(Index=i,
                       Data=data_sites,
                       Combinations=Combinations,
@@ -67,29 +68,27 @@ if(F){
     }
 
 # Split processing between practices x crops with less and more data. Inorganic fertilizer requires stacking 327 rasters and uses up a LOT of ram.
+# Note whilst this was necessary with mcapply, it may not be with future apply.
 
-# Practices x crops with less than 100 sites
-CombosA<-Combinations[!N.Sites>=100][409:418]
-
-# Update to future::apply at some point
-if(F){
-    library(future.apply)
-    plan(multisession, workers = Cores)
+ plan(multisession, workers = Cores)
 
  future.apply::future_lapply(Combinations[,which(!N.Sites>=100)],
                     combine_analogues, 
                     Data=data_sites,
                     Combinations=Combinations, 
                     SaveDir=paste0(cimdir_vr,"/results"), 
-                    overwrite=F,
+                    overwrite=T,
                     cimdir=cimdir_vr,
                     gamma=0.5,
                     SoilDir=paste0(cimdir_vr,"/all"),
+                    future.packages="terra",
                     future.seed=T
                     ) 
-}
 
- parallel::mclapply(Combinations[,which(!N.Sites>=100)],
+# Old mclappy approach
+if(F){
+    require(parallel)
+    parallel::mclapply(Combinations[,which(!N.Sites>=100)],
                     combine_analogues, 
                     Data=data_sites,
                     Combinations=Combinations, 
@@ -100,12 +99,30 @@ if(F){
                     SoilDir=paste0(cimdir_vr,"/all"),  
                     mc.cores = Cores*2, 
                     mc.preschedule = FALSE)
+}
 
  # Practices x crops with 100+ sites
- parallel::mclapply(1:nrow(Combinations[N.Sites>=100]),
+ plan(multisession, workers = 5)
+
+ future.apply::future_lapply(Combinations[,which(N.Sites>=100)],
                     combine_analogues, 
                     Data=data_sites,
-                    Combinations=Combinations[Combinations[N.Sites>=100]], 
+                    Combinations=Combinations, 
+                    SaveDir=paste0(cimdir_vr,"/results"), 
+                    overwrite=F,
+                    cimdir=cimdir_vr,
+                    gamma=0.5,
+                    SoilDir=paste0(cimdir_vr,"/all"),
+                    future.packages=c("data.table","terra"),
+                    future.seed=T
+                    ) 
+
+# Old mclappy approach
+if(F){
+ parallel::mclapply(Combinations[,which(N.Sites>=100)],
+                    combine_analogues, 
+                    Data=data_sites,
+                    Combinations=Combinations, 
                     SaveDir=paste0(cimdir_vr,"/results"), 
                     overwrite=F,
                     cimdir=cimdir_vr,
@@ -113,4 +130,6 @@ if(F){
                     SoilDir=paste0(cimdir_vr,"/all"),  
                     mc.cores = 5, 
                     mc.preschedule = FALSE)
+    }
         
+unlink(paste0("/home/jovyan/common_data/atlas_analogues/intermediate/v6/results",recursive=T))

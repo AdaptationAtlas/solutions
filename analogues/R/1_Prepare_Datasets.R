@@ -8,7 +8,7 @@ require(stats)
 
 
 # Set save location of intermediate datasets
-IntDir<-"/home/jovyan/common_data/atlas/interim/"
+IntDir<-"/home/jovyan/common_data/atlas/intermediate/"
 if(!dir.exists(IntDir)){
     dir.create(IntDir,recursive=T)
     }
@@ -17,16 +17,16 @@ if(!dir.exists(IntDir)){
 Version <- 6
 
 # Create folder for interim analysis files
-cimdir_vr <- paste0(IntDir,"analogues_v",Version)
+cimdir_vr<-paste0("/home/jovyan/common_data/atlas_analogues/intermediate/v",Version)
 
 if(!dir.exists(cimdir_vr)){
-dir.create(cimdir_vr)
-    }
+    dir.create(cimdir_vr,recursive=T)
+}
 
-# Set save location of raw datasets
-RawDir<-"/home/jovyan/common_data/atlas/raw/"
-if(!dir.exists(IntDir)){
-    dir.create(IntDir,recursive=T)
+# Set save location of datasets
+DataDir<-"/home/jovyan/common_data"
+if(!dir.exists(DataDir)){
+    dir.create(DataDir,recursive=T)
     }
 
 # Set working directory ####
@@ -36,25 +36,26 @@ if(substr(getwd(),nchar(getwd())-1,nchar(getwd()))=="/R"){
 }
 
 # Load africa map ####
-BoundIntDir<-paste0(IntDir,"0_boundaries/")
+BoundDir<-paste0(DataDir,"/atlas_boundaries/raw")
+BoundIntDir<-paste0(DataDir,"/atlas_boundaries/intermediate")
 if(!dir.exists(BoundIntDir)){
     dir.create(BoundIntDir)
     }
 
 # Dissolve borders
 if(!file.exists(paste0(BoundIntDir,"gadml0_4326_agg.shp"))){
-    sh_ctry<-terra::vect("/home/jovyan/common_data/atlas/raw/0_boundaries/gadml0_4326.shp")
+    sh_ctry<-terra::vect(BoundDir,"/gadml0_4326.shp")
     sh_ctry <- terra::project(sh_ctry, "+proj=longlat +ellps=WGS84 +no_defs")
     sh_africa<-terra::aggregate(sh_ctry)
-    terra::writeVector(sh_africa,paste0(BoundIntDir,"gadml0_4326_agg.shp"))
+    terra::writeVector(sh_africa,paste0(BoundIntDir,"/gadml0_4326_agg.shp"))
 }else{
-    sh_africa<-terra::vect(paste0(BoundIntDir,"gadml0_4326_agg.shp"))
+    sh_africa<-terra::vect(paste0(BoundIntDir,"/gadml0_4326_agg.shp"))
 }
 
 # Get historic worldclim climate data ####
-WCDir<-paste0(RawDir,"worldclim/")
+WCDir<-paste0(DataDir,"/worldclim21_hist_month_mean/raw")
 if(!dir.exists(WCDir)){
-    dir.create(WCDir)
+    dir.create(WCDir,recursive=T)
 }
      
 # Resolution = c("10m","5m","2.5m","30s")
@@ -66,7 +67,7 @@ GetWorldClim<-function(Variable,Resolution,SaveDir){
     
     for(VAR in Variable){
         URL<-paste0("https://biogeo.ucdavis.edu/data/worldclim/v2.1/base/wc2.1_",Resolution,"_",VAR,".zip")
-        destfile<-paste0(SaveDir,"wc2.1_",Resolution,"_",VAR,".zip")
+        destfile<-paste0(SaveDir,"/wc2.1_",Resolution,"_",VAR,".zip")
         # Display progress
         cat('\r                                                ')
         cat('\r',paste0("Downloading file: ",VAR))
@@ -87,6 +88,12 @@ GetWorldClim(Variable=Variables,Resolution=Resolution,SaveDir=WCDir)
 WCDirInt<-paste0(IntDir,"worldclim/")
 if(!dir.exists(WCDirInt)){
     dir.create(WCDirInt)
+}
+
+# Process historic worldclim data ####
+WCDirInt<-WCDir<-paste0(DataDir,"/worldclim21_hist_month_mean/intermediate/atlas")
+if(!dir.exists(WCDirInt)){
+    dir.create(WCDirInt,recursive=T)
 }
 
 wc_data<-lapply(Variables,FUN=function(VAR){
@@ -122,7 +129,7 @@ wc_data<-lapply(Variables,FUN=function(VAR){
 names(wc_data)<-Variables
 
 # Create a mask
-msk<-paste0(IntDir,"0_boundaries/msk.tif")
+msk<-paste0(cimdir_vr,"/msk.tif")
 if(!file.exists(msk)){
     msk<-wc_data$prec[[1]]
     msk[!is.na(msk)]<-0
@@ -132,7 +139,7 @@ if(!file.exists(msk)){
 }
 
 # Get worldclim CMIP6 ####
-WC_CMIPDir<-paste0(RawDir,"worldclim_CIMP6/")
+WC_CMIPDir<-paste0(DataDir,"/worldclim_fut/raw")
 if(!dir.exists(WC_CMIPDir)){
     dir.create(WC_CMIPDir)
 }
@@ -148,7 +155,7 @@ GetWorldClimGCMs<-function(Variable,GCMs,Scenarios,Periods,Resolutions,SaveDir){
                 for(PERIOD in Periods){
                     for(RESOLUTION in Resolutions){
                         URL<-paste0("https://geodata.ucdavis.edu/cmip6/",RESOLUTION,"/",GCM,"/",SCENARIO,"/wc2.1_",RESOLUTION,"_",VAR,"_",GCM,"_",SCENARIO,"_",PERIOD,".tif")
-                        destfile<-paste0(SaveDir,"wc2.1_",RESOLUTION,"_",VAR,"_",GCM,"_",SCENARIO,"_",PERIOD,".tif")
+                        destfile<-paste0(SaveDir,"/wc2.1_",RESOLUTION,"_",VAR,"_",GCM,"_",SCENARIO,"_",PERIOD,".tif")
                         # Display progress
                         cat('\r                                                           ')
                         cat('\r',paste0("Downloading file: ",VAR,"-",SCENARIO,"-",GCM))
@@ -167,6 +174,11 @@ GetWorldClimGCMs<-function(Variable,GCMs,Scenarios,Periods,Resolutions,SaveDir){
             }
         }
     }
+}
+
+WC_CMIPDirInt<-paste0(DataDir,"/worldclim_fut/atlas")
+if(!dir.exists(WC_CMIPDir)){
+    dir.create(WC_CMIPDir,recursive=T)
 }
 
 #GCMs<-c("ACCESS-CM2","ACCESS-ESM1-5","BCC-CSM2-MR","CanESM5","CanESM5-CanOE","CMCC-ESM2","CNRM-CM6-1","CNRM-CM6-1-HR","CNRM-ESM2-1","EC-Earth3-Veg","EC-Earth3-Veg-LR","FIO-ESM-2-0","GFDL-ESM4","GISS-E2-1-G","GISS-E2-1-H","HadGEM3-GC31-LL","INM-CM4-8","INM-CM5-0","IPSL-CM6A-LR","MIROC-ES2L","MIROC6","MPI-ESM1-2-HR","MPI-ESM1-2-LR","MRI-ESM2-0","UKESM1-0-LL")
@@ -188,7 +200,7 @@ wc_future_data<-lapply(1:nrow(Var_x_Scen),FUN=function(i){
     PERIOD<-Var_x_Scen[i,3]
     RESOLUTION<-Var_x_Scen[i,4]
 
-    File<-paste0(WCDirInt,"wc2.1_",RESOLUTION,"_",VAR,"_",SCENARIO,"_",PERIOD,".tif",sep="")
+    File<-paste0(WC_CMIPDirInt,"wc2.1_",RESOLUTION,"_",VAR,"_",SCENARIO,"_",PERIOD,".tif",sep="")
     
     # Display progress
     cat('\r',paste0("Processing: ",VAR,"-",SCENARIO,"-",PERIOD,"-",RESOLUTION))
@@ -232,8 +244,8 @@ wc_future_data<-lapply(1:nrow(Var_x_Scen),FUN=function(i){
 names(wc_data)<-apply(Var_x_Scen[,1:2],1,paste,collapse="-")
 
 # Load and prepare soilgrids ####
-SoilDir<-"/home/jovyan/common_data/soilgrids/raw/"
-SoilIntDir<-paste0(IntDir,"soilgrids/")
+SoilDir<-paste0(DataDir,"/soilgrids/raw")
+SoilIntDir<-paste0(DataDir,"/soilgrids/intermediate/atlas")
 if(!dir.exists(SoilIntDir)){
     dir.create(SoilIntDir)
     }
@@ -253,9 +265,9 @@ soilstk<-lapply(Parameters,FUN=function(PAR){
         cat('\r',paste0("Processing: ",PAR))
         flush.console()
         
-        Files<-paste0(SoilIntDir,PAR,"_",Depths,".tif")    
+        Files<-paste0(SoilIntDir,"/",PAR,"_",Depths,".tif")    
           
-        stk<-terra::rast(paste0(SoilDir,PAR,"_",Depths,".vrt"))
+        stk<-terra::rast(paste0(SoilDir,"/",PAR,"_",Depths,".vrt"))
         stk<-terra::resample(stk,msk)
         stk<-terra::mask(terra::crop(stk,msk),msk)
         

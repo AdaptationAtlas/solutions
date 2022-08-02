@@ -3,7 +3,6 @@
 #' @export
 #' @importFrom raster extract
  run_points_climate <- function(Index,Data, SaveDir, wc_prec,wc_tmean,wc_prec_fut,wc_tmean_fut,Verbose=F) {
-     data <- Data[Index] 
 
      #verbose what i'm running
          if(Verbose){
@@ -31,6 +30,8 @@
                                             writefile=F)
         X<-analogues::calc_similarity(par1)
         terra::writeRaster(X,File,overwrite=T)
+         gc()
+         File
          }
 }
 #' Wrapper to run analogues function over ERA data for soils data
@@ -106,6 +107,8 @@
                                                     writefile=F)
                 X<-analogues::calc_similarity(par1)
                 terra::writeRaster(X,File,overwrite=T)
+                gc()
+                File
             }
         }
      }
@@ -116,31 +119,40 @@
 #' @importFrom terra rast writeRaster
 #' @import data.table
 combine_analogues<-function(Index,Data,Combinations,SaveDir,overwrite,cimdir,SoilDir,gamma){
-    Practice<-Combinations[Index,PrName]
-    Product<-Combinations[Index,Product.Simple]
-    Outcome<-Combinations[Index,Out.SubInd]
-    Scenario<-Combinations[Index,Scenarios]
-    Year<-Combinations[Index,Years]
-    Threshold<-Combinations[Index,Thresholds]
+    Practice<-Combinations$PrName[Index]
+    Product<-Combinations$Product[Index]
+    Outcome<-Combinations$Out.SubInd[Index]
+    Scenario<-Combinations$Scenario[Index]
+    Year<-Combinations$Year[Index]
+    Threshold<-Combinations$Threshold[Index]
     
-    FileName<-gsub(" ","_",paste0(c(paste0("t",Threshold),Year,Scenario,Practice,Product,Outcome),collapse="-"))
+    if(Scenario != "baseline"){
+            FileName<-gsub(" ","_",paste0(c(paste0("t",Threshold),Year,Scenario,Practice,Product,Outcome),collapse="-"))
+        }else{
+            FileName<-gsub(" ","_",paste0(c(paste0("t",Threshold),Scenario,Practice,Product,Outcome),collapse="-"))
+        }
+    
     
     if(!dir.exists(SaveDir)){
         dir.create(SaveDir,recursive=T)
     }
 
     if((!file.exists(paste0(SaveDir,"/",FileName,"_maxsim.tif")))|overwrite==T){
-        ClimDir<-paste0(cimdir,"/",Year,"_",Scenario)
+            if(Scenario!="baseline"){
+                ClimDir<-paste0(cimdir,"/",Year,"_",Scenario)
+            }else{
+                ClimDir<-paste0(cimdir,"/",Scenario)
+            }
     
-    if(Threshold=="all"){
-        IDs<-Data[PrName==Practice & Product.Simple==Product & Out.SubInd==Outcome,unique(ID)]
+    if(Threshold != "all"){
+        IDs<-unique(Data[Data$PrName==Practice & Data$Product.Simple==Product & Data$Out.SubInd==Outcome,"ID"])
     }else{
         if(!grepl("m",Threshold)){
             Threshold<-as.numeric(Threshold)
-            IDs<-Data[PrName==Practice & Product.Simple==Product & Out.SubInd==Outcome & RR.pc.jen>=Threshold,unique(ID)]
+            IDs<-unique(Data[Data$PrName==Practice & Data$Product.Simple==Product & Data$Out.SubInd==Outcome & Data$RR.pc.jen>=Threshold,"ID"])
         }else{
             Threshold<-as.numeric(gsub("m","-",Threshold))
-            IDs<-Data[PrName==Practice & Product.Simple==Product & Out.SubInd==Outcome & RR.pc.jen<=Threshold,unique(ID)]
+            IDs<-unique(Data[Data$PrName==Practice & Data$Product.Simple==Product & Data$Out.SubInd==Outcome & Data$RR.pc.jen<=Threshold,"ID"])
          }            
     }
 
@@ -159,14 +171,15 @@ combine_analogues<-function(Index,Data,Combinations,SaveDir,overwrite,cimdir,Soi
             
             maxsim <- max(allstk, na.rm=TRUE)
             fsim <- max(simclim, na.rm=TRUE)^(1-gamma) * max(simsol, na.rm=TRUE)^gamma
-        }else{         
-            maxsim<-max(c(simclim,simsol), na.rm=TRUE)
+        }else{      
+            maxsim<-min(c(simclim,simsol), na.rm=TRUE)
             gamma <- 0.5
-            fsim <- simclim^(1-gamma) * simsol^gamma
+            fsi`m <- simclim^(1-gamma) * simsol^gamma
      }
         
-    suppressWarnings(terra::writeRaster(maxsim,paste0(SaveDir,"/",FileName,"_maxsim.tif"),overwrite=T))
-    suppressWarnings(terra::writeRaster(fsim,paste0(SaveDir,"/",FileName,"_fsim.tif"),overwrite=T))
+    suppressWarnings(terra::writeRaster(maxsim,paste0(SaveDir,"/",FileName,"-",length(IDs),"-maxsim.tif"),overwrite=T))
+    suppressWarnings(terra::writeRaster(fsim,paste0(SaveDir,"/",FileName,"-",length(IDs),"-fsim.tif"),overwrite=T))
+    gc()
     FileName
                        
        }

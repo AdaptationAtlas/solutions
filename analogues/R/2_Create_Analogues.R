@@ -24,27 +24,31 @@ Cores<-parallel::detectCores()-1
 # Run full or streamlined analysis?
 DoLite<-T
 
-# Set save location of intermediate datasets
-IntDir<-"/home/jovyan/common_data/atlas/interim/"
+# Set save location of datasets
+DataDir<-"/home/jovyan/common_data"
+if(!dir.exists(DataDir)){
+    dir.create(DataDir,recursive=T)
+    }
+
+
+# Set save location of intermediate analogue datasets
+IntDir<-"/home/jovyan/common_data/atlas/intermediate/"
 
 # Analysis version
 Version <- 6
 
 # Create folder for interim analysis files
-cimdir <- paste0(IntDir,"analogues/")
-cimdir_vr<-paste0(IntDir,"analogues_v",Version)
-if(!dir.exists(cimdir_vr)){
-    dir.create(cimdir_vr,recursive=T)
-}
+cimdir_vr<-paste0("/home/jovyan/common_data/atlas_analogues/intermediate/v",Version)
+
 # Africa map ####
-BoundIntDir<-paste0(IntDir,"0_boundaries/")
-sh_africa<-terra::vect(paste0(BoundIntDir,"gadml0_4326_agg.shp"))
+BoundIntDir<-paste0(DataDir,"/atlas_boundaries/intermediate")
+sh_africa<-terra::vect(paste0(BoundIntDir,"/gadml0_4326_agg.shp"))
 
 # Mask ####
-msk<-terra::rast(paste0(IntDir,"0_boundaries/msk.tif"))
+msk<-terra::rast(paste0(cimdir_vr,"/msk.tif"))
 
 # ERA ####
-data_sites<-data.table::fread(paste0(cimdir,"analogues_ERA.csv"))
+data_sites<-data.table::fread(paste0(cimdir_vr,"/analogues_ERA.csv"))
 
 # Products tp include
 # Link to MapSPAM names?
@@ -69,7 +73,10 @@ Period<-c("2021-2040","2041-2060")
 Resolution<-"2.5m"
 
 # Worldclim baseline ####
-WCDirInt<-paste0(IntDir,"worldclim/")
+WCDirInt<-paste0(DataDir,"/worldclim21_hist_month_mean/intermediate/atlas")
+if(!dir.exists(WCDirInt)){
+    dir.create(WCDirInt,recursive=T)
+}
 
 wc_data<-lapply(Variables,FUN=function(VAR){
       File<-paste0(WCDirInt,"wc2.1_",Resolution,"_",VAR,"_masked.tif") 
@@ -86,6 +93,12 @@ wc_tmean<-raster::stack((wc_tmin+wc_tmax)/2)
 rm(wc_tmin,wc_tmax)
 
 # Worldclim future####
+WC_CMIPDirInt<-paste0(DataDir,"/worldclim_fut/atlas")
+if(!dir.exists(WC_CMIPDir)){
+    dir.create(WC_CMIPDir,recursive=T)
+}
+
+
 Var_x_Scen<-expand.grid(Variables,Scenarios,Period,Resolution)
 
 wc_future_data<-lapply(1:nrow(Var_x_Scen),FUN=function(i){
@@ -94,14 +107,14 @@ wc_future_data<-lapply(1:nrow(Var_x_Scen),FUN=function(i){
     PERIOD<-Var_x_Scen[i,3]
     RESOLUTION<-Var_x_Scen[i,4]
 
-    File<-paste0(WCDirInt,"wc2.1_",RESOLUTION,"_",VAR,"_",SCENARIO,"_",PERIOD,".tif",sep="")   
+    File<-paste0(WC_CMIPDirInt,"wc2.1_",RESOLUTION,"_",VAR,"_",SCENARIO,"_",PERIOD,".tif",sep="")   
     terra::rast(File)
 })
 
 names(wc_future_data)<-apply(Var_x_Scen[,1:3],1,paste,collapse="-")
 
 # Soilgrids ####
-SoilIntDir<-paste0(IntDir,"soilgrids/")
+SoilIntDir<-"/home/jovyan/common_data/soilgrids/intermediate/atlas"
 
 SoilPars<-c("bdod","cec","clay","sand","silt","soc","phh2o")
 #Parameters<-c("sand","phh2o")
@@ -153,7 +166,7 @@ for(k in 1:nrow(Vars)){
     if(Scenario=="baseline"){
         SaveDir <- paste0(cimdir_vr,"/baseline")
     }else{
-        SaveDir <- paste0(cimdir_vr,"/",Year,"/",gsub("[.]","_",Scenario))
+        SaveDir <- paste0(cimdir_vr,"/",Year,"_",gsub("[.]","_",Scenario))
       }  
     
     if(!dir.exists(SaveDir)){
@@ -161,6 +174,18 @@ for(k in 1:nrow(Vars)){
         }
 
    # For each point calculate climate analogue-----
+   if(F){
+       lapply(1:nrow(pdata),FUN=function(i){
+           run_points_climate(Index=i,   
+                              Data=pdata, 
+                              SaveDir=SaveDir, 
+                              wc_prec=wc_prec,
+                              wc_tmean=wc_tmean,
+                              wc_prec_fut=wc_prec_fut,
+                              wc_tmean_fut=wc_tmean_fut,
+                              Verbose=F)
+        })
+    }
     
      parallel::mclapply(1:nrow(pdata),
                         run_points_climate, 
@@ -179,6 +204,13 @@ for(k in 1:nrow(Vars)){
  
 }
 
+# Check data is complete
+Vars<-data.table(Vars)
+Dirs<-c(Vars[!Scenarios=="baseline",paste0(Years,"_",Scenarios)],"baseline")
+FileN<-lapply(paste0(cimdir_vr,"/",Dirs),FUN=function(Dir){length(list.files(Dir))})
+names(FileN)<-Dirs)
+FileN
+
 # Calculate soil analagues ####
 parallel::mclapply(1:nrow(pdata),
                    run_points_soil,
@@ -189,3 +221,8 @@ parallel::mclapply(1:nrow(pdata),
                    DoAll=T,
                    mc.cores = Cores, 
                    mc.preschedule = FALSE)
+
+# Check data is complete
+Dirs<-c(names(soilstk),"all")
+FileN<-lapply(paste0(cimdir_vr,"/",Dirs),FUN=function(Dir){length(list.files(Dir,))})
+(names(FileN)<-Dirs)
