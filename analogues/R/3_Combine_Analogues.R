@@ -54,7 +54,7 @@ data.table::fwrite(Combinations,paste0(cimdir_vr,"/analogues_combinations.csv"))
 
 # lapply version of function for debugging                                                                 
 if(F){
-    lapply(Combinations,FUN=function(i){
+    lapply(1:nrow(Combinations),FUN=function(i){
     print(i)
     combine_analogues(Index=i,
                       Data=data_sites,
