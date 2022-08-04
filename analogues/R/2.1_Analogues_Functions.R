@@ -119,7 +119,7 @@
 #' @importFrom terra rast writeRaster
 #' @import data.table
 combine_analogues<-function(Index,Data,Combinations,SaveDir,overwrite,cimdir,SoilDir,gamma){
-    Data<-data.frame(Data)
+    Data<-data.frame(Data[!is.na(ID)])
     Practice<-Combinations$PrName[Index]
     Product<-Combinations$Product.Simple[Index]
     Outcome<-Combinations$Out.SubInd[Index]
@@ -147,16 +147,18 @@ combine_analogues<-function(Index,Data,Combinations,SaveDir,overwrite,cimdir,Soi
         }
         
         if(Threshold == "all"){
-            IDs<-unique(Data[Data$PrName==Practice & Data$Product.Simple==Product & Data$Out.SubInd==Outcome,"ID"])
+            IDs<-unique(Data[which(Data$PrName==Practice & Data$Product.Simple==Product & Data$Out.SubInd==Outcome),"ID"])
         }else{
             if(!grepl("m",Threshold)){
                 Threshold<-as.numeric(Threshold)
-                IDs<-unique(Data[Data$PrName==Practice & Data$Product.Simple==Product & Data$Out.SubInd==Outcome & Data$RR.pc.jen>=Threshold,"ID"])
+                IDs<-unique(Data[which(Data$PrName==Practice & Data$Product.Simple==Product & Data$Out.SubInd==Outcome & Data$RR.pc.jen>=Threshold),"ID"])
             }else{
                 Threshold<-as.numeric(gsub("m","-",Threshold))
-                IDs<-unique(Data[Data$PrName==Practice & Data$Product.Simple==Product & Data$Out.SubInd==Outcome & Data$RR.pc.jen<=Threshold,"ID"])
+                IDs<-unique(Data[which(Data$PrName==Practice & Data$Product.Simple==Product & Data$Out.SubInd==Outcome & Data$RR.pc.jen<=Threshold),"ID"])
             }
         }
+        
+        IDs<-IDs[!is.na(IDs)]
         
         if(length(IDs)>0){
             simclim<-terra::rast(paste0(ClimDir,"/",IDs,".tif")) 

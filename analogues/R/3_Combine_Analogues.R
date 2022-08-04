@@ -25,6 +25,8 @@ cimdir_vr<-paste0("/home/jovyan/common_data/atlas_analogues/intermediate/v",Vers
 MinSites<-1
 # Max number of practices in combination to consider
 MaxPracs<-1 
+# Max spatial uncertainty (m)
+MaxSpatError<-20000
 
 # Load analyzed ERA data from script 1 ####
 data_sites<-data.table::fread(paste0(cimdir_vr,"/analogues_ERA.csv"))
@@ -32,7 +34,7 @@ data_sites<-data.table::fread(paste0(cimdir_vr,"/analogues_ERA.csv"))
 # Subset data according to option values
 Y<-data_sites[PrName!="",c("N.Sites","N.Countries","N.AEZ16"):=list(length(unique(Site.ID)),length(unique(Country)),length(unique(AEZ16simple))),
         by=c("PrName","Product.Simple","Out.SubInd")
-        ][N.Sites >= MinSites
+        ][N.Sites >= MinSites & Buffer<=MaxSpatError
          ][(PrName == "Mulch-Reduced Tillage" | NPracs<=MaxPracs)]    
 
 data.table::fwrite(Y,paste0(cimdir_vr,"/analogues_ERA_subset.csv"))
@@ -74,7 +76,7 @@ if(F){
 
  future.apply::future_lapply(Combinations[,which(!N.Sites>=100)],
                     combine_analogues, 
-                    Data=data_sites,
+                    Data=as.data.frame(data_sites),
                     Combinations=Combinations, 
                     SaveDir=paste0(cimdir_vr,"/results"), 
                     overwrite=T,
