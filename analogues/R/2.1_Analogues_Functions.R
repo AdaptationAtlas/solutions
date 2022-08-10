@@ -119,7 +119,8 @@
 #' @importFrom terra rast writeRaster
 #' @import data.table
 combine_analogues<-function(Index,Data,Combinations,SaveDir,overwrite,cimdir,SoilDir,gamma){
-    Data<-data.frame(Data[!is.na(ID)])
+    Data<-as.data.frame(Data)
+    
     Practice<-Combinations$PrName[Index]
     Product<-Combinations$Product.Simple[Index]
     Outcome<-Combinations$Out.SubInd[Index]

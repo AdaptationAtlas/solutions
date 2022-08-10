@@ -55,15 +55,15 @@ data_sites<-data.table::fread(paste0(cimdir_vr,"/analogues_ERA.csv"))
 
 IncludeProducts<-c("Sorghum","Groundnut","Pearl Millet","Maize","Cotton","Wheat","Cowpea","Tomato","Cassava","Pigeon Pea","Rice","Soybean","Chickpea","Sunflower","Arabica","Peas","Common Bean","Sweet Potato","Banana","Robusta","Rape","Yam","Potato","Tea","Barley","Fava Bean","Canola")
 
+data_sites[grepl("Banana",Product.Simple),Product.Simple:="Banana"]             
+
 # Subset ERA data
    # Consider moving all subsetting to combine analogues script
-data_sites[grepl("Banana",Product.Simple),Product.Simple:="Banana"]             
-data_sites<-data_sites[Product.Simple %in% IncludeProducts
-                      ][,ID:=paste0("s",Lat,"_",Lon)] 
+data_sites<-data_sites[Product.Simple %in% IncludeProducts & Out.SubInd == "Crop Yield" & !(is.na(Lat) & is.na(Lon))]
 
 data.table::fwrite(data_sites,paste0(cimdir_vr,"/analogues_ERA_subset.csv"))
 
-pdata<-unique(data.table(data_sites)[Out.SubInd == "Crop Yield" & !(is.na(Lat) & is.na(Lon)),c("Lon","Lat","ID")])
+pdata<-unique(data.table(data_sites)[,c("Lon","Lat","ID")])
 
 # Worldclim ####
 # Set parameters to include in analysis

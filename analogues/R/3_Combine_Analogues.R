@@ -29,15 +29,13 @@ MaxPracs<-1
 MaxSpatError<-20000
 
 # Load analyzed ERA data from script 1 ####
-data_sites<-data.table::fread(paste0(cimdir_vr,"/analogues_ERA.csv"))
+data_sites<-data.table::fread(paste0(cimdir_vr,"/analogues_ERA_subset.csv"))
 
 # Subset data according to option values
 Y<-data_sites[PrName!="",c("N.Sites","N.Countries","N.AEZ16"):=list(length(unique(Site.ID)),length(unique(Country)),length(unique(AEZ16simple))),
         by=c("PrName","Product.Simple","Out.SubInd")
         ][N.Sites >= MinSites & Buffer<=MaxSpatError
          ][(PrName == "Mulch-Reduced Tillage" | NPracs<=MaxPracs)]    
-
-data.table::fwrite(Y,paste0(cimdir_vr,"/analogues_ERA_subset.csv"))
 
 X<-unique(Y[,list(PrName,Product.Simple,Out.SubInd,N.Sites,N.Countries)])
 
@@ -56,16 +54,18 @@ data.table::fwrite(Combinations,paste0(cimdir_vr,"/analogues_combinations.csv"))
 
 # lapply version of function for debugging                                                                 
 if(F){
-    lapply(1:nrow(Combinations),FUN=function(i){
-    print(i)
-    combine_analogues(Index=i,
-                      Data=data_sites,
-                      Combinations=Combinations,
-                      SaveDir=paste0(cimdir_vr,"/results"),
-                      overwrite=F,
-                      cimdir=cimdir_vr,
-                      gamma=0.5,
-                      SoilDir=paste0(cimdir_vr,"/all"))
+   # lapply(1:nrow(Combinations),FUN=function(i){
+    lapply(Combinations[,which(N.Sites>=100)],FUN=function(i){
+        print(i)
+        X<-combine_analogues(Index=i,
+                          Data=data_sites,
+                          Combinations=Combinations,
+                          SaveDir=paste0(cimdir_vr,"/results"),
+                          overwrite=F,
+                          cimdir=cimdir_vr,
+                          gamma=0.5,
+                          SoilDir=paste0(cimdir_vr,"/all"))
+        i
     })
     }
 
@@ -79,7 +79,7 @@ if(F){
                     Data=as.data.frame(data_sites),
                     Combinations=Combinations, 
                     SaveDir=paste0(cimdir_vr,"/results"), 
-                    overwrite=T,
+                    overwrite=F,
                     cimdir=cimdir_vr,
                     gamma=0.5,
                     SoilDir=paste0(cimdir_vr,"/all"),
@@ -87,24 +87,8 @@ if(F){
                     future.seed=T
                     ) 
 
-# Old mclappy approach
-if(F){
-    require(parallel)
-    parallel::mclapply(Combinations[,which(!N.Sites>=100)],
-                    combine_analogues, 
-                    Data=data_sites,
-                    Combinations=Combinations, 
-                    SaveDir=paste0(cimdir_vr,"/results"), 
-                    overwrite=F,
-                    cimdir=cimdir_vr,
-                    gamma=0.5,
-                    SoilDir=paste0(cimdir_vr,"/all"),  
-                    mc.cores = Cores*2, 
-                    mc.preschedule = FALSE)
-}
-
  # Practices x crops with 100+ sites
- plan(multisession, workers = 5)
+ plan(multisession, workers = 3)
 
  future.apply::future_lapply(Combinations[,which(N.Sites>=100)],
                     combine_analogues, 
@@ -119,19 +103,4 @@ if(F){
                     future.seed=T
                     ) 
 
-# Old mclappy approach
-if(F){
- parallel::mclapply(Combinations[,which(N.Sites>=100)],
-                    combine_analogues, 
-                    Data=data_sites,
-                    Combinations=Combinations, 
-                    SaveDir=paste0(cimdir_vr,"/results"), 
-                    overwrite=F,
-                    cimdir=cimdir_vr,
-                    gamma=0.5,
-                    SoilDir=paste0(cimdir_vr,"/all"),  
-                    mc.cores = 5, 
-                    mc.preschedule = FALSE)
-    }
-        
-unlink(paste0("/home/jovyan/common_data/atlas_analogues/intermediate/v6/results",recursive=T))
+# unlink(paste0("/home/jovyan/common_data/atlas_analogues/intermediate/v6/results",recursive=T))

@@ -300,7 +300,7 @@ source("R/ERAAnalyze.R")
 source("R/OutCalc.R")
 
 # Set analysis aggregation level to site, practice, subindicator and product.simple
-agg_by <- c("Site.ID","Country","Latitude","Longitude","AEZ16simple","PrName","Out.SubInd","Product.Simple","Product.Type")
+agg_by <- c("Site.ID","Country","Latitude","Longitude","Buffer","AEZ16simple","PrName","Out.SubInd","Product.Simple","Product.Type")
 
 # Subset data to crop yield
 ERA_Derived<-ERA_Derived[Out.SubInd=="Crop Yield"]
@@ -329,6 +329,9 @@ data.table::setnames(data_sites,c("Longitude","Latitude"),c("Lon","Lat"))
 data_sites<-data_sites[,isvalid:=terra::extract(msk, data_sites[,c("Lon","Lat")])[,2]
                       ][!is.na(isvalid)
                        ][,isvalid:=NULL]
+
+# Create an ID field
+data_sites[,ID:=paste0("s",Lat,"_",Lon)] 
 
 # Save ERA dataset
 data.table::fwrite(data_sites,paste0(cimdir_vr,"/analogues_ERA.csv"))
