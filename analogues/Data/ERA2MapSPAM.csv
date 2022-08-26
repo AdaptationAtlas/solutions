@@ -1,42 +1,42 @@
-ERA,MapSPAM,,,,
-Arabica,arabica coffee,,,,
-Banana Sweet,banana,,,,
-Barley,barley,,,,
-Common Bean,bean,,,,
-Cassava,cassava,,,,
-Chickpea,chickpea,,,,
-Cocoa,cocoa,,,,
-Coconut,coconut,,,,
-Cotton,cotton,,,,
-Cowpea,cowpea,,,,
-Groundnut,groundnut,,,,
-Lentil,lentil,,,,
-Maize,maize,,,,
-Not in ERA,oilpalm,,,,
-NA,other cereals,,,,
-NA,other fibre crops,,,,
-NA,other oil crops,,,,
-NA,other pulses,,,,
-NA,other roots,,,,
-Pearl Millet,pearl millet,,,,
-Pigeon Pea,pigeonpea,,,,
-Cooking Banana,plantain,,,,
-Potato,potato,,,,
-Rape,rapeseed,,,,
-Rice,rice,,,,
-Robusta,robusta coffee,,,,
-Sesame,sesameseed,,,,
-Pearl Millet,small millet,,,,`
-Sorghum,sorghum,,,,
-Soybean,soybean,,,,
-Sugar Beet,sugarbeet,,,,
-Sugar Cane,sugarcane,,,,
-Sunflower,sunflower,,,,
-Sweet Potato,sweet potato,,,,
-Tea,tea,,,,
-NA,temperate fruit,,,,
-Tobacco,tobacco,,,,
-NA,tropical fruit,,,,
-NA,vegetables,,,,
-Wheat,wheat,,,,
-Yam,yams,,,,
+ERA,MapSPAM,MapSPAM_code
+Arabica,arabica coffee,ACOF
+Banana Sweet,banana,BANA
+Barley,barley,BARL
+Common Bean,bean,BEAN
+Cassava,cassava,CASS
+Chickpea,chickpea,CHIC
+Cocoa,cocoa,CNUT
+Coconut,coconut,COCO
+Cotton,cotton,COTT
+Cowpea,cowpea,COWP
+Groundnut,groundnut,GROU
+Lentil,lentil,LENT
+Maize,maize,MAIZ
+Not in ERA,oilpalm,OILP
+NA,other cereals,OCER
+NA,other fibre crops,OFIB
+NA,other oil crops,OOIL
+NA,other pulses,OPUL
+NA,other roots,ORTS
+Pearl Millet,pearl millet,PMIL
+Pigeon Pea,pigeonpea,PIGE
+Cooking Banana,plantain,PLNT
+Potato,potato,POTA
+Rape,rapeseed,RAPE
+Rice,rice,RICE
+Robusta,robusta coffee,RCOF
+Sesame,sesameseed,SESA
+Pearl Millet,small millet,SMIL
+Sorghum,sorghum,SORG
+Soybean,soybean,SOYB
+Sugar Beet,sugarbeet,SUGB
+Sugar Cane,sugarcane,SUGC
+Sunflower,sunflower,SUNF
+Sweet Potato,sweet potato,SWPO
+Tea,tea,TEAS
+NA,temperate fruit,TEMF
+Tobacco,tobacco,TOBA
+NA,tropical fruit,TROF
+NA,vegetables,VEGE
+Wheat,wheat,WHEA
+Yam,yams,YAMS
