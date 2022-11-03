@@ -208,7 +208,7 @@ for(k in 1:nrow(Vars)){
 Vars<-data.table(Vars)
 Dirs<-c(Vars[!Scenarios=="baseline",paste0(Years,"_",Scenarios)],"baseline")
 FileN<-lapply(paste0(cimdir_vr,"/",Dirs),FUN=function(Dir){length(list.files(Dir))})
-names(FileN)<-Dirs)
+names(FileN)<-Dirs
 FileN
 
 # Calculate soil analagues ####
