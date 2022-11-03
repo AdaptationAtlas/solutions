@@ -191,7 +191,7 @@ combine_analogues<-function(Index,Data,Combinations,SaveDir,overwrite,cimdir,Soi
 #' @export
 #' @importFrom terra rast writeRaster
 #' @import data.table
-combine_analogues_limits<-function(Index,Data,Combinations,SaveDir,overwrite,cimdir,SoilDir,minsim,doRR=T){
+combine_analogues_limits<-function(Index,Data,Combinations,SaveDir,overwrite,cimdir,SoilDir,minsim,doRR=T,doN=F){
     Data<-as.data.frame(Data)
     
     Practice<-Combinations$PrName[Index]
@@ -200,25 +200,28 @@ combine_analogues_limits<-function(Index,Data,Combinations,SaveDir,overwrite,cim
     Scenario<-Combinations$Scenarios[Index]
     Year<-Combinations$Years[Index]
     
-    if(Scenario != "baseline"){
-            FileName<-gsub(" ","_",paste0(c(Year,Scenario,Practice,Product,Outcome),collapse="-"))
-        }else{
-            FileName<-gsub(" ","_",paste0(c(Scenario,Practice,Product,Outcome),collapse="-"))
-        }
-    
-    
-    if(!dir.exists(SaveDir)){
+     if(!dir.exists(SaveDir)){
         dir.create(SaveDir,recursive=T)
     }
+    
+    if(Scenario != "baseline"){
+        FileName<-gsub(" ","_",paste0(c(Year,Scenario,Practice,Product,Outcome),collapse="-"))
+    }else{
+        FileName<-gsub(" ","_",paste0(c(Scenario,Practice,Product,Outcome),collapse="-"))
+    }
 
-    if((!file.exists(paste0(SaveDir,"/",FileName,"_maxsim.tif")))|overwrite==T){
+    if(doN){
+     FileName<-paste0("n-",FileName)
+    }
         
-        if(Scenario!="baseline"){
-            ClimDir<-paste0(cimdir,"/",Year,"_",Scenario)
-        }else{
-            ClimDir<-paste0(cimdir,"/",Scenario)
-        }
-        
+    if((!any(grepl(FileName,list.files(SaveDir))))|overwrite){
+
+            if(Scenario!="baseline"){
+                ClimDir<-paste0(cimdir,"/",Year,"_",Scenario)
+            }else{
+                ClimDir<-paste0(cimdir,"/",Scenario)
+            }
+                
         IDs<-unique(Data[which(Data$PrName==Practice & Data$Product.Simple==Product & Data$Out.SubInd==Outcome &!is.na(Data$ID)),c("ID","RR","PC")])
           
         if(nrow(IDs)>0){
@@ -227,36 +230,61 @@ combine_analogues_limits<-function(Index,Data,Combinations,SaveDir,overwrite,cim
         PC<-IDs$PC
         IDs<-IDs$ID
             
-        # x = similarity, y = value (e.g. RR or PC)
+   
+            simclim<-terra::rast(paste0(ClimDir,"/",IDs,".tif")) 
+            simsol<-terra::rast(paste0(SoilDir,"/",IDs,".tif"))
+            
+            # Find minimum suitability of soil and climate
+            allstk<-terra::rast(lapply(IDs,FUN=function(ID){
+                simclim<-terra::rast(paste0(ClimDir,"/",ID,".tif"))
+                simsol<-terra::rast(paste0(SoilDir,"/",ID,".tif"))
+                min(c(simclim,simsol), na.rm=TRUE)
+            }))  
+        
+       # If doN is TRUE then the function outputs a data availabity map of studies per Practice x Product x Outcome per pixel
+       if(doN){
+           
+          simn<-function(x,y,minsim){
+              x<-x[!x<minsim]
+              return(length(x))
+          }
+           
+           if(length(IDs)>1){
+               sim_y<-terra::app(allstk,fun=simn,minsim=minsim)
+           }else{
+               sim_y<-allstk
+               sim_y[sim_y<minsim]<-NA
+               sim_y[!is.na(minsim)]<-1
+           }
+           
+        }else{
+        
+         # x = similarity, y = value (e.g. RR or PC)
         simrank<-function(x,y,minsim){
             y<-y[!x<minsim]
             x<-x[!x<minsim]
             if(length(x)>0){
                 ranks<-(1:length(x))[order(x,decreasing=T)]
+                
                 return(weighted.mean(y[ranks],x[ranks]))
             }else{
                 return(NA)
             }
-        }
+        }            
             
-            simclim<-terra::rast(paste0(ClimDir,"/",IDs,".tif")) 
-            simsol<-terra::rast(paste0(SoilDir,"/",IDs,".tif"))
-            
-                # Find minimum suitability of soil and climate
-                allstk<-terra::rast(lapply(IDs,FUN=function(ID){
-                    simclim<-terra::rast(paste0(ClimDir,"/",ID,".tif"))
-                    simsol<-terra::rast(paste0(SoilDir,"/",ID,".tif"))
-                    min(c(simclim,simsol), na.rm=TRUE)
-                }))
-                
-                sim_y<-terra::app(allstk,fun=simrank,y=if(doRR){RR}else{PC},minsim=minsim)
+           if(length(IDs)>1){
+               sim_y<-terra::app(allstk,fun=simrank,y=if(doRR){RR}else{PC},minsim=minsim)
+          }else{
+              sim_y<-allstk
+              sim_y[sim_y<minsim]<-NA
+          }
+       }
             
             suppressWarnings(terra::writeRaster(sim_y,paste0(SaveDir,"/",FileName,"-",length(IDs),".tif"),overwrite=T))
             gc()
             FileName
-                
-            }
-        
-  
         }
     }
+}
+
+    

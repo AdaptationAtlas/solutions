@@ -55,7 +55,7 @@ Combinations<-data.table(Vars[rep(1:nrow(Vars),each=nrow(X)),],X[rep(1:nrow(X),n
 # lapply version of function for debugging                                                                 
 if(F){
    # lapply(1:nrow(Combinations),FUN=function(i){
-    lapply(Combinations[,which(N.Sites>=100)],FUN=function(i){
+    lapply(1:nrow(Combinations),FUN=function(i){
         print(i)
         X<-combine_analogues_limits(Index=i,
                           Data=data_sites,
@@ -64,7 +64,8 @@ if(F){
                           overwrite=F,
                           cimdir=cimdir_vr,
                           minsim=minsim,
-                          doRR=T,                                    
+                          doRR=T,  
+                          doN=F,
                           SoilDir=paste0(cimdir_vr,"/all"))
         i
     })
@@ -84,6 +85,7 @@ if(F){
                     cimdir=cimdir_vr,
                     minsim=minsim,
                     doRR=T,   
+                    doN=F,
                     SoilDir=paste0(cimdir_vr,"/all"),
                     future.packages="terra",
                     future.seed=T
@@ -101,9 +103,33 @@ if(F){
                     cimdir=cimdir_vr,
                     minsim=minsim,
                     doRR=T, 
+                    doN=F,
                     SoilDir=paste0(cimdir_vr,"/all"),
                     future.packages=c("data.table","terra"),
                     future.seed=T
                     ) 
 
 # unlink(paste0("/home/jovyan/common_data/atlas_analogues/intermediate/v6/results",recursive=T))
+
+
+# Number of studies per pixel ####
+
+# lapply version of function for debugging                                                                 
+if(F){
+   # lapply(1:nrow(Combinations),FUN=function(i){
+    lapply(1:nrow(Combinations),FUN=function(i){
+        print(i)
+        X<-combine_analogues_limits(Index=i,
+                          Data=data_sites,
+                          Combinations=Combinations,
+                          SaveDir=paste0(cimdir_vr,"/results_mean/nstudies"),
+                          overwrite=F,
+                          cimdir=cimdir_vr,
+                          minsim=minsim,
+                          doRR=T,
+                          doN=T,
+                          SoilDir=paste0(cimdir_vr,"/all"))
+        i
+    })
+    }
+
