@@ -59,9 +59,6 @@ generic_crop_mask<-terra::classify(ms_crops_area,cbind(c(0,Threshold),c(Threshol
 
 
 # Set values each yield threshold will take, make sure thresholds are in ascending order
-Tvals<-data.frame(Val=c(0,1,2,3,4,-9999),
-                  Lab=c("<0%","0-10%","10-25%","25-50%",">50%","NoData"))
-
 
 Files<-list.files(results_dir,".tif")
 X<-as.numeric(gsub(".tif","",unlist(lapply(strsplit(Files,"-"),tail,1))))
@@ -72,32 +69,48 @@ BaseFiles<-Files[grepl("baseline",Files)]
 SSPFiles<-Files[!grepl("baseline",Files)]
 
 
+# Set values each yield threshold will take, make sure thresholds are in ascending order
+Tvals<-data.frame(Val=c(0,1,2,3,4,5,6,9999,-9999),
+                  Lab=c("<-50","-50:-25","-25:-5","-5:5","5:25","25:50",">50","Base_NoData","Scen_NoData"))
+
+
 for(i in 1:length(BaseFiles)){
   
   cat('\r                                 ')
   cat("Processing ", i, "of", length(BaseFiles))
   flush.console()
   
-  SSPFiles<-Files[!grepl("baseline",Files) & grepl(gsub("baseline-","",BaseFiles[1]),Files)]
+  SSPFiles<-Files[!grepl("baseline",Files) & grepl(gsub("baseline-","",BaseFiles[i]),Files)]
+  
+  Baseline<-terra::rast(paste0(results_dir,"/",BaseFiles[i]))
   
   for(j in 1:length(SSPFiles)){
     
-    if(!file.exists())
+    if(!file.exists(paste0(save_dir,"/",SSPFiles[j]))){
 
-    Rast<-terra::rast(paste0(results_dir,"/",Files[i]))
-    Rast<-terra::resample(Rast,base_raster)
+    Scenario<-terra::rast(paste0(results_dir,"/",SSPFiles[j]))
     
-    Rast<-terra::classify(Rast,as.matrix(data.frame(from=log(c(0.00001,1,1.1,1.25,1.50)),
-                                                    to=log(c(1,1.1,1.25,1.5,9999)),
-                                                    val=c(0,1,2,3,4))))
+    Rast<-100*(exp(Scenario)-exp(Baseline))
     
-    Rast[is.na(Rast) & !is.na(generic_crop_mask)]<--9999
+
+    Rast<-terra::classify(Rast,as.matrix(data.frame(from=c(-9999,-50,-25,-5,5,25,50),
+                                                    to=c(-50,-25,-5,5,25,50,9999),
+                                                    val=c(0,1,2,3,4,5,6))))
+    
+    # Scenario is NA and Baseline is not = -9999
+    Rast[is.na(Scenario) & !is.na(Baseline)]<--9999
+      
+    # Baseline is NA and Scenario is not = 9999
+    Rast[is.na(Baseline) & !is.na(Scenario)]<-9999
     
     # Assign levels to the raster
     levels(Rast)<-Tvals
     
-    terra::writeRaster(Rast,paste0(save_dir,"/",Files[i]))
-  
+    Rast<-terra::resample(Rast,base_raster,method="near")
+
+    terra::writeRaster(Rast,paste0(save_dir,"/",SSPFiles[j]))
+
+    }
   }
 }
 

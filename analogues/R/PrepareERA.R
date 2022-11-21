@@ -134,7 +134,8 @@ PrepareERA<-function(Data,
   DataX<-DataX[,..Cols]
 
   DataX[,pc:=100*((MeanT/MeanC)-1)
-  ][,yi:=log(MeanT/MeanC)]
+  ][,yi:=log(MeanT/MeanC)
+    ][,Yield.Diff:=MeanT-MeanC]
 
   Practices<-unique(unlist(strsplit(unique(DataX$PrName),"-")))
   Subpractices<-unique(unlist(strsplit(unique(DataX$SubPrName),"-")))
