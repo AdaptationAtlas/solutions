@@ -23,8 +23,12 @@ cimdir_vr<-paste0(DataDir,"/atlas_analogues/intermediate/v",Version)
 # Location of weighted mean files
 results_dir<-paste0(cimdir_vr,"/results_mean")
 
+# Create MapSPAM crop mask (%)
+Threshold<-5
+
+
 # Save directory for classified files
-save_dir<-paste0(cimdir_vr,"/results_mean_class_crop")
+save_dir<-paste0(cimdir_vr,"/results_mean_class_crop",Threshold)
 if(!dir.exists(save_dir)){
   dir.create(save_dir,recursive=T)
 }
@@ -62,9 +66,6 @@ names(ms_crops_area)<-gsub("_A","",names(ms_crops_area))
 names(ms_crops_area)<-era2ms[match(names(ms_crops_area),MapSPAM_code),ERA]
 ms_crops_area<-ms_crops_area[[names(ms_crops_area)!="NA"]]
 
-# Create MapSPAM crop mask (%)
-Threshold<-1
-
 # All crops summed
 generic_crop_mask<-terra::classify(sum(ms_crops_area),cbind(c(0,Threshold),c(Threshold,9999),c(NA,1)))
 
@@ -81,25 +82,57 @@ X<-as.numeric(gsub(".tif","",unlist(lapply(strsplit(Files,"-"),tail,1))))
 
 Files<-Files[X>=10]
 
+
+# MVP practices and renaming conventions
+MVP_Pracs<-c(Agroforestry="Alleycropping",
+             `Inorganic Fertilizers`="Inorganic_Fertilizer",
+             `Organic Fertilizers`="Organic_Fertilizer",
+             Intercropping="Intercropping",
+              Mulch="Mulch",
+             `Mulch Reduced Tillage` = "Mulch_Reduced_Tillage",
+             `Reduced Tillage`="Reduced_Tillage",
+             Irrigation="Supplemental_Irrigation",
+             `Water Harvesting`="Water_Harvesting")
+
+# Make vector of practice names
+Practices<-rep("",length(Files))
+Practices[grepl("baseline",Files)]<-unlist(tstrsplit(Files[grepl("baseline",Files)],"-",keep=2))
+Practices[!grepl("baseline",Files)]<-unlist(tstrsplit(Files[!grepl("baseline",Files)],"-",keep=3))
+
+# Create data.table of file info
+Files<-data.table(Files=Files,Practice=Practices)
+
+# Subset to MVP practices
+Files<-Files[Practice %in% MVP_Pracs]
+
+# Add rename column
+Files$Practice_new<-names(MVP_Pracs)[match(Files$Practice,MVP_Pracs)]
+
+
 # Make vector of crop names to link to map spam area by crop
-Crop<-rep("",length(Files))
-Crop[grepl("baseline",Files)]<-unlist(tstrsplit(Files[grepl("baseline",Files)],"-",keep=3))
-Crop[!grepl("baseline",Files)]<-unlist(tstrsplit(Files[!grepl("baseline",Files)],"-",keep=4))
-Crop[grepl("baseline-Mulch-Red",Files)]<-unlist(tstrsplit(Files[grepl("baseline-Mulch-Red",Files)],"-",keep=4))
-Crop[!grepl("baseline-Mulch-Red",Files) & grepl("Mulch-Red",Files)]<-unlist(tstrsplit(Files[!grepl("baseline-Mulch-Red",Files)  & grepl("Mulch-Red",Files)],"-",keep=5))
+Crop<-rep("",length(Files$Files))
+Crop[grepl("baseline",Files$Files)]<-unlist(tstrsplit(Files$Files[grepl("baseline",Files$Files)],"-",keep=3))
+Crop[!grepl("baseline",Files$Files)]<-unlist(tstrsplit(Files$Files[!grepl("baseline",Files$Files)],"-",keep=4))
+Crop[grepl("baseline-Mulch-Red",Files$Files)]<-unlist(tstrsplit(Files$Files[grepl("baseline-Mulch-Red",Files$Files)],"-",keep=4))
+Crop[!grepl("baseline-Mulch-Red",Files$Files) & grepl("Mulch-Red",Files$Files)]<-unlist(tstrsplit(Files$Files[!grepl("baseline-Mulch-Red",Files$Files)  & grepl("Mulch-Red",Files$Files)],"-",keep=5))
 Crop<-gsub("_"," ",Crop)
+
+Files$Crop<-Crop
+
+# Create new file save name
+Files[,SaveName:=gsub(Practice,Practice_new,Files),by=Files]
 
 # Overwrite?
 Overwrite<-T
 
-for(i in 1:length(Files)){
+for(i in 1:nrow(Files)){
   
   cat('\r                                 ')
-  cat("Processing ", i, "of", length(Files))
+  cat("Processing ", i, "of", nrow(Files))
   flush.console()
   
-  if((!file.exists(paste0(save_dir,"/",Files[i])))|Overwrite){
-    Rast<-terra::rast(paste0(results_dir,"/",Files[i]))
+  if((!file.exists(paste0(save_dir,"/",Files$SaveName[i])))|Overwrite){
+    Rast<-terra::rast(paste0(results_dir,"/",Files$Files[i]))
     Rast<-terra::resample(Rast,base_raster)
     
     Rast<-terra::classify(Rast,as.matrix(data.frame(from=log(c(0.00001,1,1.1,1.25,1.50)),
@@ -109,13 +142,13 @@ for(i in 1:length(Files)){
       if(use_generic_mask){
           Rast[is.na(Rast) & !is.na(generic_crop_mask)]<--9999
           }else{
-           Rast[is.na(Rast) & !is.na(ms_crops_area[[Crop[i]]])]<--9999
+           Rast[is.na(Rast) & !is.na(ms_crops_area[[Files$Crop[i]]])]<--9999
       }
     
     # Assign levels to the raster
     levels(Rast)<-Tvals
     
-    terra::writeRaster(Rast,paste0(save_dir,"/",Files[i]),overwrite=Overwrite)
+    terra::writeRaster(Rast,paste0(save_dir,"/",Files$SaveName[i]),overwrite=Overwrite)
   }
 }
 
