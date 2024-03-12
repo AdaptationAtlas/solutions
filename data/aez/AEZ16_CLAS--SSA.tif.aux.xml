@@ -1,0 +1,22 @@
+<PAMDataset>
+  <PAMRasterBand band="1">
+    <ColorInterp>Gray</ColorInterp>
+    <CategoryNames>
+      <Category>Subtropic - warm / arid</Category>
+      <Category>Subtropic - warm / semiarid</Category>
+      <Category>Subtropic - warm / subhumid</Category>
+      <Category>Subtropic - warm / humid</Category>
+      <Category>Subtropic - cool / arid</Category>
+      <Category>Subtropic - cool / semiarid</Category>
+      <Category>Subtropic - cool / subhumid</Category>
+      <Category>Tropic - warm / arid</Category>
+      <Category>Tropic - warm / semiarid</Category>
+      <Category>Tropic - warm / subhumid</Category>
+      <Category>Tropic - warm / humid</Category>
+      <Category>Tropic - cool / arid</Category>
+      <Category>Tropic - cool / semiarid</Category>
+      <Category>Tropic - cool / subhumid</Category>
+      <Category>Tropic - cool / humid</Category>
+    </CategoryNames>
+  </PAMRasterBand>
+</PAMDataset>
