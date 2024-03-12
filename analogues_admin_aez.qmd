@@ -1,0 +1,233 @@
+---
+title: "analogues_admin_aez"
+author: "Pete Steward"
+format: html
+runtime: shiny
+---
+
+```{r load packages,echo=F,message=F,warning=F}
+load_and_install_packages <- function(packages) {
+  options(repos = c(CRAN = "https://cloud.r-project.org/")) # Set CRAN mirror
+  
+  for (package in packages) {
+    if (!require(package, character.only = TRUE)) {
+      install.packages(package)
+      library(package, character.only = TRUE)
+    } else if (package == "ggplot2") {
+      # Check if currently installed ggplot2 version is older than 3.5.0
+      if (packageVersion("ggplot2") < "3.5.0") {
+        install.packages("ggplot2")
+        library(ggplot2, character.only = TRUE)
+      }
+    }
+  }
+}
+
+packages <- c("shinydashboard","data.table","shiny","arrow","ggplot2","DT","ggiraph") # Ensure correct package names
+
+load_and_install_packages(packages)
+```
+
+```{css, echo=FALSE,eval=T}
+.shiny-frame{
+  width: 100vw;
+  height: 100vw;
+}
+
+.shiny-page-wrapper, .container-fluid {
+  margin: 0.5vw !important;
+  padding: 0.5vw !important;
+}
+
+```
+
+```{r set parameter values,echo=F,message=F,warning=F}
+# Set scenarios and time frames to analyse
+Scenarios<-c("ssp245","ssp585")
+Times<-c("2030","2050")
+Scenarios<-data.table(expand.grid(Scenario=Scenarios,Time=Times))[,Combined:=paste0(Scenario,"-",Time)]
+```
+
+```{r,load data,echo=F}
+data<-arrow::read_parquet("data/results_mean_class_crop5_ex/analogues_ex_aez_admin.parquet")[,outcome:=NULL][!grepl("Intercropping",solution)]
+setnames(data,"Lab","impact")
+```
+
+```{r set up ui,echo=F}
+ui <- dashboardPage(
+  dashboardHeader(title = "Hazards QAQC"),
+  dashboardSidebar(width=300,
+    sidebarMenu(style = "position: fixed; overflow: visible;",
+      selectInput("scenario", "Choose scenario:", choices = unique(Scenarios$Combined), selected = "ssp245-2030"),
+      selectInput("crop", "Choose crop:", choices = unique(data$crop), selected = "maize"),
+      selectInput("solution", "Choose solution:", choices = NULL),
+      tags$label("Choose countries:", class = "control-label",style = "padding-left: 15px;"),
+      fluidRow(
+        column(5, actionButton("select_all", "Select All", class = "btn-block")),
+        column(5, actionButton("select_none", "Select None", class = "btn-block"))
+      ),
+      selectizeInput("admin0", label=NULL, choices = unique(data$admin_name), selected = c("Kenya","Uganda","Tanzania","Ethiopia","Somalia"),multiple=T),
+      selectInput("agg_var", "Choose aggregation:", choices = c("aez","admin areas"), selected = "aez")
+    )
+    ),
+  dashboardBody(
+    fluidRow(
+      box(DT::dataTableOutput("data_filtered"), width = 10) 
+      ),
+    fluidRow(
+      box(girafeOutput("plot"),width=10)
+      ),
+    fluidRow(
+      box(DT::dataTableOutput("data_filtered_agg"), width = 10) 
+      )
+    )
+  )
+  
+```
+
+
+```{r set up server,echo=F,eval=T}
+server <- function(input, output, session) {
+  
+  # Reactive expression for filtering unique solutions based on the selected crop
+  reactive_solutions <- reactive({
+    req(input$crop) # Ensure that input$crop is available before proceeding
+    data[data$crop == input$crop, unique(solution)]
+  })
+  
+  # Observe changes to input$crop and update the solution selectInput
+  observe({
+    updateSelectInput(session, "solution",
+                      choices = reactive_solutions())
+  })
+  
+  # Observe event for the 'Select All' button
+  observeEvent(input$select_all, {
+    updateSelectizeInput(session, "admin0", selected = unique(data$admin_name))
+  })
+
+  # Observe event for the 'Select None' button
+  observeEvent(input$select_none, {
+    updateSelectizeInput(session, "admin0", selected = character(0))
+  })
+
+  observe({
+    print(paste("scenario:", input$scenario))
+    print(paste("Crop:", input$crop))
+    print(paste("Solution:", input$solution))
+    print(paste("Countries:", input$admin0))
+    print(paste("agg_var:", input$agg_var))
+  })
+  
+  data_filtered<-reactive({
+    scen<-unlist(tstrsplit(input$scenario,"-",keep=1))
+    time<-unlist(tstrsplit(input$scenario,"-",keep=2))
+    
+    data_filtered<-data[scenario %in% c(scen,"historic") & timeframe %in% c(time,"historic") & crop==input$crop & admin_name %in% input$admin0 & solution %in% input$solution]
+
+    
+    
+   if(input$agg_var=="aez"){
+      data_filtered<-data_filtered[!is.na(impact),list(area=sum(area)),by=list(aez,solution,crop,studies,impact,scenario,timeframe)
+                                   ][,total_area:=sum(area),by=list(aez,solution,crop,scenario,timeframe)]
+   }else{
+      data_filtered<-data_filtered[!is.na(impact),list(area=sum(area)),by=list(admin_name,solution,crop,studies,impact,scenario,timeframe)
+                                   ][,total_area:=sum(area),by=list(admin_name,solution,crop,scenario,timeframe)]
+   }
+    
+    data_filtered[,perc:=100*area/total_area][,scenario:=paste0(scenario,"-",timeframe)][,timeframe:=NULL]
+    
+  })
+  
+  output$data_filtered<-DT::renderDataTable({
+    DT::datatable(data_filtered()[,!c("area","total_area")], 
+                  extensions = 'Buttons', options = list(
+                    pageLength = 10,
+                    autoWidth = TRUE,
+                    dom = 'Blfrtip',  
+                    buttons = c('copy', 'csv', 'excel', 'pdf', 'print'),  # Define the buttons for downloading data
+                    filter = "top",
+                    searchHighlight = TRUE  # Highlight the matching content when filtering
+                    )) %>%
+      DT::formatRound(columns = "perc", digits = 2) 
+  })
+  
+ data_filtered_agg<-reactive({
+        data_filtered_agg<-data_filtered()[,list(area=sum(area)),by=list(solution,crop,studies,impact,scenario)
+                                           ][,total_area:=sum(area),by=list(solution,crop,scenario)
+                                             ][,perc:=100*area/total_area]
+        
+        data_filtered_agg<-dcast(data_filtered_agg,solution+crop+impact~scenario,value.var = "perc")
+        data_filtered_agg$change<-data_filtered_agg[,5]-data_filtered_agg[,4]
+        return(data_filtered_agg)
+ })
+ 
+  output$data_filtered_agg<-DT::renderDataTable({
+    DT::datatable(data_filtered_agg(), extensions = 'Buttons', options = list(
+      pageLength = 25,
+      autoWidth = TRUE,
+      dom = 'Blfrtip',  # Use B for Buttons, l for length changing input control, f for filtering input, r for processing display element, t for the table, i for table information summary, p for pagination control
+      buttons = c('copy', 'csv', 'excel', 'pdf', 'print'),  # Define the buttons for downloading data
+      filter = "top",
+      searchHighlight = TRUE  # Highlight the matching content when filtering
+      ))  %>%
+      DT::formatRound(columns = 4:6, digits = 2)
+  })
+
+  output$plot <- renderGirafe({
+    
+    if(input$agg_var=="aez"){
+      data<-data_filtered()
+      data[,variable:=aez]
+      ylab<-"aez"
+    }else{
+      data<-data_filtered()
+      data[,variable:=admin_name]
+      ylab<-"admin0"
+    }
+     
+    # Convert impact to a factor and set the levels in the desired order
+    data$impact <- factor(data$impact, levels = c("NoData", "<0%", "0-10%", "10-25%", "25-50%", ">50%"))
+    
+     custom_colors <- c("NoData" = "grey91", "<0%" = "red", "0-10%" = "palegreen", "10-25%" = "green", "25-50%" = "darkgreen",">50%" = "black")
+    
+    # Create the stacked bar plot using ggplot2
+    p<-ggplot(data, aes(x = reorder(variable, -perc), y = perc, fill = impact,tooltip = paste(impact,sprintf("%.1f%%", perc)))) +
+      geom_bar_interactive(stat = "identity") + # Use stat="identity" for pre-summarized data
+      facet_grid(solution~scenario) + # Facet by solution
+      theme_minimal() + # Use a minimal theme
+      labs(x = ylab, y = "Percentage crop area",fill="Impact") + # Label your axes
+      scale_fill_manual(values = custom_colors)+
+      coord_flip()+ # Flip the coordinates to have AEZ on the y-axis
+      theme(
+        axis.text = element_text(size=14),      
+        axis.title = element_text(size = 16), # Adjusting axis title size
+        axis.text.y = element_text(size = 14), # Adjust space around y axis labels
+        legend.title = element_text(size = 16), # Adjusting legend title size
+        legend.text = element_text(size = 14), # Adjusting legend text size.
+        legend.position = "bottom", # Move legend to top
+        legend.direction = "horizontal", # Align legend items horizontally
+        panel.grid.major = element_blank(), # Remove major gridlines
+        panel.grid.minor = element_blank(), # Remove minor gridlines
+        strip.text = element_text(size = 16),
+        panel.spacing.x = unit(0.7, "cm")
+      )+
+      scale_y_continuous(expand = expansion(add = c(0, 0)))
+    
+  # Use ggiraph to render the interactive plot
+    girafe(ggobj = p,width_svg = 12,height_svg = 6)    
+  })
+  }
+```
+
+```{r, echo=F}
+shinyApp(ui, server)
+```
+
+```{r,eval=FALSE}
+# 1) Change -> historic to baseline
+# 3) Toggle to remove NoData
+# 4) Intersect with VoP? subset to important aez
+# 5) Scale bar width with vop?
+# 6) aggregate over all countries?
+```
