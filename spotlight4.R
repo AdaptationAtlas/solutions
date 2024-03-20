@@ -9,7 +9,7 @@ load_and_install_packages <- function(packages) {
 }
 
 # List of packages to be loaded
-packages <- c("data.table","metafor","ggplot2")
+packages <- c("data.table","metafor","ggplot2","terra","readxl")
 
 # Call the function to install and load packages
 load_and_install_packages(packages)
@@ -54,12 +54,14 @@ rename_cols<-c(Practice="PrName",
                Studies="Studies",
                Value="RR.pc.jen",
                Value="estimate",
+               Value.se="se.model",
                Sig="RR.Pr(>|t|)",
                Sig="sig",
                CIlow="RR.pc.jen.CIlow",
                CIhigh="RR.pc.jen.CIhigh",
                CIlow="ci.low.lmer",
-               CIhigh="ci.high.lmer")
+               CIhigh="ci.high.lmer"
+               )
 new_cols<-unique(names(rename_cols))
 
 # Choose practices to include
@@ -203,6 +205,9 @@ data_p[grepl(paste0(pracs_include,collapse="|"),PrName),list(Observations=.N,Stu
 ][,list(MeanT=mean(MeanT,na.rm=T),MeanC=mean(MeanC,na.rm=T)),by=list(Code,Country,Site.ID,PrName,PrName.Base,Tree,Diversity,Product.Simple,Out.SubInd,Units)])
 
 # 3) Notebook 3 plots & data ####
+if(!dir.exists("data/spotlight4")){
+  dir.create("data/spotlight4")
+}
 # 3.1) Figure 1 ####
 # Analyze data
 figure1_dat<-era_analyze_wm(data=data_p,rmOut=T,aggregate_by=c("PrName","Out.SubInd"),rounding=5)
@@ -215,6 +220,11 @@ setnames(x=figure1_dat,
          skip_absent = T)
 
 figure1_dat<-figure1_dat[,..new_cols][order(Studies,decreasing=T)]
+
+figure1_dat<-figure1_dat[,list(Practice,Outcome,Product,Observations,Studies,Value,Sig,Value.se,CIlow,CIhigh)]
+
+# Save data
+fwrite(figure1_dat,file="data/spotlight4/spotlight2_Extended Table 2.csv")
 
 # Plot 
 ggplot(figure1_dat[order(Observations,decreasing=T)], 
@@ -243,6 +253,11 @@ setnames(x=figure2_dat,
 
 figure2_dat<-figure2_dat[,..new_cols][order(Studies,decreasing=T)]
 
+figure2_dat<-figure2_dat[,list(Practice,Outcome,Product,Observations,Studies,Value,Sig,Value.se,CIlow,CIhigh)]
+
+# Save data
+fwrite(figure2_dat,file="data/spotlight4/figure_2_data.csv")
+
 # Plot 
 ggplot(figure2_dat[Product=="Maize" & Studies>4][order(Observations,decreasing=T)], 
        aes(x=reorder(Practice, Value), y=Value,color=Value)) + 
@@ -257,9 +272,70 @@ ggplot(figure2_dat[Product=="Maize" & Studies>4][order(Observations,decreasing=T
   geom_text(aes(label = Studies, y = 4500), hjust = 0) +  # Add text labels to the right
   coord_flip() # This will flip the axes so the practices are on the y-axis like in your image
 
-# 2.3) Mean difference by agroecology zone ####
 
-# 3) Impute missing standard deviations ####
+
+# 3.3) Figure3: Mean difference by agroecology zone ####
+# Add AEZ to dataset
+aez<-terra::rast("data/aez/aez_v9v2red_5m_CRUTS32_Hist_8110_100_avg.tif")
+
+crs(aez)<- "+proj=longlat +datum=WGS84 +no_defs"
+
+# Since the extent needs to be -180 to +180 and -90 to +90, 
+ext(aez) <- c(-180, 180, -90, 90)
+
+# Read in class values
+aez_meta<-readxl::read_excel("data/aez/Mean_yield_difference.xlsx",sheet="AEZ_Classes")
+aez_names<-aez_meta$AEZ_Class_FAO
+
+cls<-data.frame(id=c(1:length(aez_names)),AEZ_Class_FAO=aez_names)
+levels(aez)<-cls
+
+terra::writeRaster(aez,filename = "data/aez/aez_v9v2red_5m_CRUTS32_Hist_8110_100_avg_v2.tif")
+
+# Create points layer for era data
+data_p[,ID:=1:.N]
+data_p[,list(ID,Latitude,Longitude)]
+
+pts <- vect(data_p, geom=c("Longitude", "Latitude"), crs="+proj=longlat +datum=WGS84")
+pts_ext<-extract(aez,pts)
+
+data_p<-merge(data_p,pts_ext)
+
+# Analyze weighted means by agroecological zone
+figure3_dat<-era_analyze_wm(data=data_p,rmOut=T,aggregate_by=c("PrName","Out.SubInd","Product.Simple","AEZ_Class_FAO"),rounding=5)
+figure3_dat<-figure3_dat[Studies>min_studies][order(Studies,decreasing = T)]
+
+# Rename and subset columns
+rename_cols2<-c(rename_cols,Mean_T="wmean_t",Mean_C="wmean_c",AEZ_Class_FAO="AEZ_Class_FAO")
+names(rename_cols2)[names(rename_cols2)=="Value"]<-"Mean_Difference"
+names(rename_cols2)[names(rename_cols2)=="Value.se"]<-"Se"
+names(rename_cols2)[names(rename_cols2)=="Studies"]<-"N_Pub"
+names(rename_cols2)[names(rename_cols2)=="Observations"]<-"N_Obs"
+names(rename_cols2)[names(rename_cols2)=="CIlow"]<-"Lower"
+names(rename_cols2)[names(rename_cols2)=="CIhigh"]<-"Upper"
+names(rename_cols2)[names(rename_cols2)=="Product"]<-"Crop"
+new_cols2<-unique(names(rename_cols2))
+
+setnames(x=figure3_dat,
+         old=rename_cols2,
+         new=names(rename_cols2),
+         skip_absent = T)
+
+figure3_dat<-figure3_dat[,..new_cols2][order(N_Pub,decreasing=T)][,Outcome:=NULL]
+
+# Convert to Mg/ha
+figure3_dat[,Mean_Difference:=Mean_Difference/1000
+            ][,Se:=Se/1000
+              ][,Lower:=Lower/1000
+                ][,Upper:=Upper/1000
+                  ][,Mean_T:=Mean_T/1000
+                    ][,Mean_C:=Mean_C/1000]
+
+figure3_dat<-figure3_dat[,list(Practice,Crop,AEZ_Class_FAO,N_Obs,N_Pub,Mean_T,Mean_C,Mean_Difference,Se,Lower,Upper)]
+
+fwrite(figure3_dat,file = "data/spotlight4/Mean_yield_difference.csv")
+
+# 4) Impute missing standard deviations ####
 # We are following the All Cases approach detailed in Nakagawa, S., et al. (2022). "A robust and readily implementable method for the meta-analysis of response ratios with and without missing standard deviations." Ecol Lett. doi: 10.1111/ele.14144
 # Nagakawa 2022 use  Taylor expansion proposed by Lajeunesse 2011 to calculate the log response ratio (equation 6 in their publication) and the sampling variance 
 # for log response ratio (equation 7 in their publication).
@@ -366,7 +442,7 @@ era_dat_imputed[!is.na(MeanT.CV),paste0(round(100*sum(((1/MeanT.CV)*((4*Rep^(3/2
 # Where Rep==1 add one for SMD calcs (otherwise escalc yield an error)
 era_dat_imputed[,Rep_a1:=Rep][Rep==1,Rep_a1:=Rep+1]
 
-# 4) Claculate standardized mean difference ####
+# 5) Claculate standardized mean difference ####
 era_dat_imputed <- data.table(escalc(measure = "SMDH", 
                                      m1i= MeanT, 
                                      m2i= MeanC, 
@@ -381,7 +457,7 @@ era_dat_imputed <- data.table(escalc(measure = "SMDH",
 
 era_dat_imputed[,Rep_a1:=NULL]
 
-# 5) Run 3-level models ####
+# 6) Run 3-level models ####
 # Create unique observation ID
 era_dat_imputed[,ES_ID:=as.character(1:.N)]
 
