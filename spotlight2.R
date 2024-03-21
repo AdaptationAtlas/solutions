@@ -46,7 +46,7 @@ practice_aggregation<-T
 # Set min studies
 min_studies<-3
 
-# Set columns to subset by and new names for them for use with output tables
+# Set columns to subset by and new names for them for use with output tables (Figure 1)
 rename_cols<-c(Practice="PrName",
                Outcome="Out.SubInd",
                Product="Product.Simple",
@@ -63,6 +63,18 @@ rename_cols<-c(Practice="PrName",
                CIhigh="ci.high.lmer"
                )
 new_cols<-unique(names(rename_cols))
+
+# Rename and subset columns for Figures 2 and 3
+rename_cols2<-c(rename_cols,Mean_T="wmean_t",Mean_C="wmean_c",AEZ_Class_FAO="AEZ_Class_FAO")
+names(rename_cols2)[names(rename_cols2)=="Value"]<-"Mean_Difference"
+names(rename_cols2)[names(rename_cols2)=="Value.se"]<-"Se"
+names(rename_cols2)[names(rename_cols2)=="Studies"]<-"N_Pub"
+names(rename_cols2)[names(rename_cols2)=="Observations"]<-"N_Obs"
+names(rename_cols2)[names(rename_cols2)=="CIlow"]<-"Lower"
+names(rename_cols2)[names(rename_cols2)=="CIhigh"]<-"Upper"
+names(rename_cols2)[names(rename_cols2)=="Product"]<-"Crop"
+new_cols2<-unique(names(rename_cols2))
+
 
 # Choose practices to include
 pracs_include<-PracticeCodes[!(Theme %in% c("Animals","Energy","Non-CSA","Postharvest")|grepl("h",Code)),unique(Practice)]
@@ -247,34 +259,36 @@ figure2_dat<-figure2_dat[Studies>min_studies][order(Studies,decreasing = T)]
 
 # Rename and subset columns
 setnames(x=figure2_dat,
-         old=rename_cols,
-         new=names(rename_cols),
+         old=rename_cols2,
+         new=names(rename_cols2),
          skip_absent = T)
 
-figure2_dat<-figure2_dat[,..new_cols][order(Studies,decreasing=T)]
+new_cols2a<-new_cols2[!grepl("AEZ",new_cols2)]
 
-figure2_dat<-figure2_dat[,list(Practice,Outcome,Product,Observations,Studies,Value,Sig,Value.se,CIlow,CIhigh)]
+figure2_dat<-figure2_dat[,..new_cols2a][order(N_Pub,decreasing=T)]
+
+figure2_dat<-figure2_dat[,list(Practice,Crop,N_Obs,N_Pub,Mean_T,Mean_C,Mean_Difference,Se,Lower,Upper)]
 
 # Save data
 fwrite(figure2_dat,file="data/spotlight4/figure_2_data.csv")
 
 # Plot 
-ggplot(figure2_dat[Product=="Maize" & Studies>4][order(Observations,decreasing=T)], 
-       aes(x=reorder(Practice, Value), y=Value,color=Value)) + 
-  geom_point(aes(size=Studies))+ 
+ggplot(figure2_dat[Crop=="Maize" & N_Pub >4][order(N_Obs,decreasing=T)], 
+       aes(x=reorder(Practice, Mean_Difference), y=Mean_Difference,color=Mean_Difference)) + 
+  geom_point(aes(size=N_Pub ))+ 
   scale_color_gradient2(low = "yellow2",mid="greenyellow", high = "darkgreen",guide="none") +  # Color gradient from yellow to dark green
   geom_hline(yintercept = 0, linetype = "dashed") +  # Add a dashed vertical line (since coord_flip will be used)
   labs(x="Practice", y="Mean difference in yield (kg/ha)") + 
-  geom_errorbar(aes(ymin = CIlow, ymax = CIhigh), width = 0.2) +  # Add horizontal error bars
+  geom_errorbar(aes(ymin = Lower, ymax = Upper), width = 0.2) +  # Add horizontal error bars
   theme_minimal() + 
   theme(panel.grid.major.y = element_blank(),  # Remove horizontal grid lines
         panel.grid.minor.y = element_blank()) +
-  geom_text(aes(label = Studies, y = 4500), hjust = 0) +  # Add text labels to the right
+  geom_text(aes(label = N_Pub , y = 4500), hjust = 0) +  # Add text labels to the right
   coord_flip() # This will flip the axes so the practices are on the y-axis like in your image
 
 
 
-# 3.3) Figure3: Mean difference by agroecology zone ####
+# 3.3) Figure 3: Mean difference by agroecology zone ####
 # Add AEZ to dataset
 aez<-terra::rast("data/aez/aez_v9v2red_5m_CRUTS32_Hist_8110_100_avg.tif")
 
@@ -304,17 +318,6 @@ data_p<-merge(data_p,pts_ext)
 # Analyze weighted means by agroecological zone
 figure3_dat<-era_analyze_wm(data=data_p,rmOut=T,aggregate_by=c("PrName","Out.SubInd","Product.Simple","AEZ_Class_FAO"),rounding=5)
 figure3_dat<-figure3_dat[Studies>min_studies][order(Studies,decreasing = T)]
-
-# Rename and subset columns
-rename_cols2<-c(rename_cols,Mean_T="wmean_t",Mean_C="wmean_c",AEZ_Class_FAO="AEZ_Class_FAO")
-names(rename_cols2)[names(rename_cols2)=="Value"]<-"Mean_Difference"
-names(rename_cols2)[names(rename_cols2)=="Value.se"]<-"Se"
-names(rename_cols2)[names(rename_cols2)=="Studies"]<-"N_Pub"
-names(rename_cols2)[names(rename_cols2)=="Observations"]<-"N_Obs"
-names(rename_cols2)[names(rename_cols2)=="CIlow"]<-"Lower"
-names(rename_cols2)[names(rename_cols2)=="CIhigh"]<-"Upper"
-names(rename_cols2)[names(rename_cols2)=="Product"]<-"Crop"
-new_cols2<-unique(names(rename_cols2))
 
 setnames(x=figure3_dat,
          old=rename_cols2,
