@@ -236,7 +236,7 @@ figure1_dat<-figure1_dat[,..new_cols][order(Studies,decreasing=T)]
 figure1_dat<-figure1_dat[,list(Practice,Outcome,Product,Observations,Studies,Value,Sig,Value.se,CIlow,CIhigh)]
 
 # Save data
-fwrite(figure1_dat,file="data/spotlight4/spotlight2_Extended Table 2.csv")
+fwrite(figure1_dat,file="data/spotlight2/spotlight2_Extended Table 2.csv")
 
 # Plot 
 ggplot(figure1_dat[order(Observations,decreasing=T)], 
@@ -270,7 +270,7 @@ figure2_dat<-figure2_dat[,..new_cols2a][order(N_Pub,decreasing=T)]
 figure2_dat<-figure2_dat[,list(Practice,Crop,N_Obs,N_Pub,Mean_T,Mean_C,Mean_Difference,Se,Lower,Upper)]
 
 # Save data
-fwrite(figure2_dat,file="data/spotlight4/figure_2_data.csv")
+fwrite(figure2_dat,file="data/spotlight2/figure_2_data.csv")
 
 # Plot 
 ggplot(figure2_dat[Crop=="Maize" & N_Pub >4][order(N_Obs,decreasing=T)], 
@@ -336,7 +336,7 @@ figure3_dat[,Mean_Difference:=Mean_Difference/1000
 
 figure3_dat<-figure3_dat[,list(Practice,Crop,AEZ_Class_FAO,N_Obs,N_Pub,Mean_T,Mean_C,Mean_Difference,Se,Lower,Upper)]
 
-fwrite(figure3_dat,file = "data/spotlight4/Mean_yield_difference.csv")
+fwrite(figure3_dat,file = "data/spotlight2/Mean_yield_difference.csv")
 
 # 4) Impute missing standard deviations ####
 # We are following the All Cases approach detailed in Nakagawa, S., et al. (2022). "A robust and readily implementable method for the meta-analysis of response ratios with and without missing standard deviations." Ecol Lett. doi: 10.1111/ele.14144
