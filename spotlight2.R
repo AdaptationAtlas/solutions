@@ -235,6 +235,12 @@ figure1_dat<-figure1_dat[,..new_cols][order(Studies,decreasing=T)]
 
 figure1_dat<-figure1_dat[,list(Practice,Outcome,Product,Observations,Studies,Value,Sig,Value.se,CIlow,CIhigh)]
 
+figure1_dat[,Value:=Value/1000
+            ][,Value.se:=Value.se/1000
+              ][,CIlow:=CIlow/1000
+                ][,CIhigh:=CIhigh/1000
+                  ][,Units:="Mg/ha"]
+
 # Save data
 fwrite(figure1_dat,file="data/spotlight2/spotlight2_Extended Table 2.csv")
 
@@ -268,6 +274,13 @@ new_cols2a<-new_cols2[!grepl("AEZ",new_cols2)]
 figure2_dat<-figure2_dat[,..new_cols2a][order(N_Pub,decreasing=T)]
 
 figure2_dat<-figure2_dat[,list(Practice,Crop,N_Obs,N_Pub,Mean_T,Mean_C,Mean_Difference,Se,Lower,Upper)]
+
+figure2_dat[,Mean_Difference:=Mean_Difference/1000
+            ][,Se:=Se/1000
+              ][,Lower:=Lower/1000
+                ][,Upper:=Upper/1000
+                  ][,Mean_T:=Mean_T/1000
+                    ][,Mean_C:=Mean_C/1000]
 
 # Save data
 fwrite(figure2_dat,file="data/spotlight2/figure_2_data.csv")
