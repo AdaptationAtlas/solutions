@@ -257,7 +257,7 @@ ggplot(figure1_dat[order(Observations,decreasing=T)],
   coord_flip() +# This will flip the axes so the practices are on the y-axis like in your image
   scale_fill_gradient(low = "yellow", high = "darkgreen",guide="none")   # Color gradient from yellow to dark green
   
-# 3.2) Figure 2: Mean difference aggregated across cr####
+# 3.2) Figure 2: Mean difference aggregated across crops ####
 
 figure2_dat<-era_analyze_wm(data=data_p,rmOut=T,aggregate_by=c("PrName","Out.SubInd","Product.Simple"),rounding=5)
 
@@ -298,8 +298,6 @@ ggplot(figure2_dat[Crop=="Maize" & N_Pub >4][order(N_Obs,decreasing=T)],
         panel.grid.minor.y = element_blank()) +
   geom_text(aes(label = N_Pub , y = 4500), hjust = 0) +  # Add text labels to the right
   coord_flip() # This will flip the axes so the practices are on the y-axis like in your image
-
-
 
 # 3.3) Figure 3: Mean difference by agroecology zone ####
 # Add AEZ to dataset
