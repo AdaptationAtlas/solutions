@@ -13,27 +13,26 @@
   It implements algorithms to map **agroecological analogues** between locations—comparing climate, yield, and management characteristics to identify transferable adaptation options.
 
   ---
-
-  ## 📁 Repository Structure
-
-  solutions/
-  ├── analogues_admin_aez.qmd      # Quarto notebook driving the analysis and visualization
-  ├── spotlight2.R                 # Supporting analysis script for highlighting regions
-  ├── R/                           # Core analytical functions
-  │   ├── 1_Prepare_Datasets.R
-  │   ├── 2_Create_Analogues.R
-  │   ├── 3_Combine_Analogues_Limits.R
-  │   ├── 4.1_Classify_Thresholds_Limits.R
-  │   ├── 5_admin_extract.R
-  │   ├── ERAAnalyze.R, PrepareERA.R, OutCalc.R
-  │   └── archive/ (older script versions)
-  ├── data/
-  │   ├── ERA_Derived.rda, Practices.csv, Outcomes.csv
-  │   ├── aez/ (AEZ and climate rasters)
-  │   ├── boundaries/atlas-region_admin0_harmonized.gpkg
-  │   └── results_mean_class_crop5_ex/ (example outputs)
-  └── analogues_admin_aez.html     # Rendered interactive notebook
-
+## 📁 Repository Structure
+```
+solutions/
+├── analogues_admin_aez.qmd      # Quarto notebook driving the analysis and visualization
+├── spotlight2.R                 # Supporting analysis script for highlighting regions
+├── R/                           # Core analytical functions
+│   ├── 1_Prepare_Datasets.R
+│   ├── 2_Create_Analogues.R
+│   ├── 3_Combine_Analogues_Limits.R
+│   ├── 4.1_Classify_Thresholds_Limits.R
+│   ├── 5_admin_extract.R
+│   ├── ERAAnalyze.R, PrepareERA.R, OutCalc.R
+│   └── archive/ (older script versions)
+├── data/
+│   ├── ERA_Derived.rda, Practices.csv, Outcomes.csv
+│   ├── aez/ (AEZ and climate rasters)
+│   ├── boundaries/atlas-region_admin0_harmonized.gpkg
+│   └── results_mean_class_crop5_ex/ (example outputs)
+└── analogues_admin_aez.html     # Rendered interactive notebook
+```
   ---
 
   ## 🔍 Key Functions
